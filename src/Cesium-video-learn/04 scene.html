@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="../lib/Cesium/Cesium.js"></script> <!-- bulid文件夹下的Cesium.js,是核心功能的js文件 -->
+  <link rel="stylesheet" href="../lib/Cesium/Widgets/widgets.css"> <!-- //核心样式 -->
+  <style>
+    html,body,#cesiumContainer{
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <script>
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZDE2NTBjZi1jNGIyLTRlYmQtOTE5NS1iMGEzMjZkYzY2ZDciLCJpZCI6MzcxODU1LCJpYXQiOjE3NzU2MzYwOTF9.-vafpENPNz2ukkC8Y9Y3iDJdCGnZiPpGJatyZ7mfqYU';
+    //创建Cesium Viewer
+    const viewer = new Cesium.Viewer('cesiumContainer',{
+      animation: false, //关闭左下角动画控制
+      timeline: false, //关闭时间轴
+      baseLayerPicker: false, //图层选择控件
+      fullscreenButton: false, //全屏按钮
+    });
+
+
+//scene可以修改整个环境场景，绘制集合体，控制对场景的交互
+
+
+  //scene是Cesium中表示场景的对象，包含了地球、天空、光照等元素，可以通过viewer.scene来访问和操作场景
+  //scene.globe是场景中的地球对象，包含了地球的各种属性和方法，可以通过viewer.scene.globe来访问和操作地球
+    viewer.scene.globe.show = false; //隐藏地球
+    //还可与场景交互
+    viewer.scene.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(116.397428, 39.90923, 1000), //设置相机位置
+      orientation: {
+        heading: Cesium.Math.toRadians(0), //相机方向
+        pitch: Cesium.Math.toRadians(-90), //相机俯仰角
+        roll: 0 //相机滚转角
+      }
+    });
+  </script>
+</head>
+<body>
+
+</body>
+</html>

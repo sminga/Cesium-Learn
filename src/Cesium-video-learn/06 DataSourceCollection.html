@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="../lib/Cesium/Cesium.js"></script> <!-- bulid文件夹下的Cesium.js,是核心功能的js文件 -->
+  <link rel="stylesheet" href="../lib/Cesium/Widgets/widgets.css"> <!-- //核心样式 -->
+  <style>
+    html,body,#cesiumContainer{
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <script>
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZDE2NTBjZi1jNGIyLTRlYmQtOTE5NS1iMGEzMjZkYzY2ZDciLCJpZCI6MzcxODU1LCJpYXQiOjE3NzU2MzYwOTF9.-vafpENPNz2ukkC8Y9Y3iDJdCGnZiPpGJatyZ7mfqYU';
+    //创建Cesium Viewer
+    const viewer = new Cesium.Viewer('cesiumContainer');
+
+    //dataSourceCollection是Cesium中表示数据源集合的类，可以通过viewer.dataSources来访问和操作数据源集合
+    //数据源是Cesium中表示场景中数据的类，可以通过添加不同类型的数据源来加载和显示不同类型的数据，如GeoJSON数据源、KML数据源、CZML数据源等
+    //数据源集合可以通过viewer.dataSources.add()方法来添加数据源，
+    // 也可以通过viewer.dataSources.remove()方法来从场景中移除数据源，
+    // 还可以通过viewer.dataSources.getByName()方法来获取特定名称的数据源   
+
+    //czmldataSource是Cesium中表示CZML数据源的类，可以通过添加CZML数据源来加载和显示CZML格式的数据，CZML是一种基于JSON的格式，用于描述时间动态的地理数据，如位置、属性、动画等
+    //kmlDataSource是Cesium中表示KML数据源的类，可以通过添加KML数据源来加载和显示KML格式的数据，KML是一种基于XML的格式，用于描述地理数据，如点、线、面、模型等
+    //geoJsonDataSource是Cesium中表示GeoJSON数据源的类，可以通过添加GeoJSON数据源来加载和显示GeoJSON格式的数据，GeoJSON是一种基于JSON的格式，用于描述地理数据，如点、线、面等
+
+    //添加CZML数据源
+    // const czmDataSource = new Cesium.CzmlDataSource();
+    // viewer.dataSources.add(czmDataSource);
+    // czmDataSource.load('data/airline.czml');
+
+    // //添加KML数据源
+    // const kmlDataSource = new Cesium.KmlDataSource();
+    // viewer.dataSources.add(kmlDataSource);
+    // kmlDataSource.load('data/airlines.kml');
+
+    // //添加GeoJSON数据源 Cesium-learn/src/01创建地球.html
+    // const geoJsonDataSource = new Cesium.GeoJsonDataSource();
+    // viewer.dataSources.add(geoJsonDataSource);          
+    // geoJsonDataSource.load('data/airlines.geojson');
+
+    viewer.dataSources.add(
+      Cesium.GeoJsonDataSource.load('../libs/Cesium/SampleData/ne_10m_populated_places_simple.geojson')
+    )
+
+  viewer.zoomTo(dataSource); //缩放到数据源所在的位置
+  </script>
+</head>
+<body>
+
+</body>
+</html>

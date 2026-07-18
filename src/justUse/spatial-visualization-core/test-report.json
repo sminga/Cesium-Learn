@@ -1,0 +1,219 @@
+{
+  "summary": {
+    "total": 26,
+    "passed": 26,
+    "failed": 0,
+    "pass_rate": "100.0%"
+  },
+  "results": [
+    {
+      "category": "页面加载",
+      "test_name": "页面成功加载",
+      "passed": true,
+      "message": "页面加载完成，进入networkidle状态",
+      "error": null,
+      "timestamp": "2026-04-20T13:53:45.337386"
+    },
+    {
+      "category": "页面加载",
+      "test_name": "加载遮罩隐藏",
+      "passed": true,
+      "message": "加载完成后遮罩应隐藏",
+      "error": null,
+      "timestamp": "2026-04-20T13:53:46.595943"
+    },
+    {
+      "category": "页面加载",
+      "test_name": "Cesium容器可见",
+      "passed": true,
+      "message": "3D地球容器应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:53:46.989050"
+    },
+    {
+      "category": "页面加载",
+      "test_name": "控制面板可见",
+      "passed": true,
+      "message": "左侧控制面板应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:53:47.885831"
+    },
+    {
+      "category": "页面加载",
+      "test_name": "状态栏可见",
+      "passed": true,
+      "message": "底部状态栏应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:53:48.489140"
+    },
+    {
+      "category": "风场可视化",
+      "test_name": "风场数据加载",
+      "passed": true,
+      "message": "状态: 已加载",
+      "error": null,
+      "timestamp": "2026-04-20T13:53:49.085473"
+    },
+    {
+      "category": "风场可视化",
+      "test_name": "显示/隐藏切换",
+      "passed": true,
+      "message": "按钮文字从 '隐藏' 变为 '显示'",
+      "error": null,
+      "timestamp": "2026-04-20T13:53:57.100191"
+    },
+    {
+      "category": "风场可视化",
+      "test_name": "初始化视角按钮可用",
+      "passed": true,
+      "message": "按钮应可用",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:03.150037"
+    },
+    {
+      "category": "风场可视化",
+      "test_name": "初始化视角执行",
+      "passed": true,
+      "message": "视角动画执行完成",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:12.314705"
+    },
+    {
+      "category": "风场可视化",
+      "test_name": "粒子参数面板可见",
+      "passed": true,
+      "message": "dat.gui面板应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:12.435859"
+    },
+    {
+      "category": "林火蔓延",
+      "test_name": "林火蔓延面板可见",
+      "passed": true,
+      "message": "面板应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:13.283005"
+    },
+    {
+      "category": "林火蔓延",
+      "test_name": "燃料模型选项",
+      "passed": true,
+      "message": "应有13个选项，实际: 13",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:14.199217"
+    },
+    {
+      "category": "林火蔓延",
+      "test_name": "初始化按钮可用",
+      "passed": true,
+      "message": "按钮应可用",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:15.149599"
+    },
+    {
+      "category": "林火蔓延",
+      "test_name": "初始化执行",
+      "passed": true,
+      "message": "状态: 已初始化",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:28.073356"
+    },
+    {
+      "category": "林火蔓延",
+      "test_name": "点火按钮可用",
+      "passed": true,
+      "message": "初始化后应可用",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:29.014792"
+    },
+    {
+      "category": "高斯泼溅",
+      "test_name": "高斯泼溅面板可见",
+      "passed": true,
+      "message": "面板应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:29.849608"
+    },
+    {
+      "category": "高斯泼溅",
+      "test_name": "初始化按钮可用",
+      "passed": true,
+      "message": "按钮应可用",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:30.746063"
+    },
+    {
+      "category": "高斯泼溅",
+      "test_name": "文件输入可见",
+      "passed": true,
+      "message": "文件选择器应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:31.670235"
+    },
+    {
+      "category": "高斯泼溅",
+      "test_name": "位置输入可见",
+      "passed": true,
+      "message": "经纬度输入应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:33.489197"
+    },
+    {
+      "category": "地图服务",
+      "test_name": "地图设置面板可见",
+      "passed": true,
+      "message": "面板应可见",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:34.341127"
+    },
+    {
+      "category": "UI布局",
+      "test_name": "Section标题数量",
+      "passed": true,
+      "message": "应有至少4个section，实际: 5",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:35.233904"
+    },
+    {
+      "category": "UI布局",
+      "test_name": "按钮渲染",
+      "passed": true,
+      "message": "共17个按钮，7个可用",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:49.474499"
+    },
+    {
+      "category": "控制台",
+      "test_name": "无严重错误",
+      "passed": true,
+      "message": "发现 0 个错误日志",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:49.475007"
+    },
+    {
+      "category": "控制台",
+      "test_name": "主程序日志",
+      "passed": true,
+      "message": "发现 3 条主程序日志",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:49.475534"
+    },
+    {
+      "category": "控制台",
+      "test_name": "数据清洗日志",
+      "passed": true,
+      "message": "发现 1 条数据清洗日志",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:49.475534"
+    },
+    {
+      "category": "截图",
+      "test_name": "最终截图保存",
+      "passed": true,
+      "message": "保存到 test-screenshot-final.png",
+      "error": null,
+      "timestamp": "2026-04-20T13:54:55.520977"
+    }
+  ],
+  "errors": []
+}

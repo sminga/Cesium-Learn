@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="../../lib/Cesium/Cesium.js"></script> <!-- bulid文件夹下的Cesium.js,是核心功能的js文件 -->
+  <link rel="stylesheet" href="../../lib/Cesium/Widgets/widgets.css"> <!-- //核心样式 -->
+  <style>
+    html,
+    body,
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="cesiumContainer"></div>
+  <script>
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZDE2NTBjZi1jNGIyLTRlYmQtOTE5NS1iMGEzMjZkYzY2ZDciLCJpZCI6MzcxODU1LCJpYXQiOjE3NzU2MzYwOTF9.-vafpENPNz2ukkC8Y9Y3iDJdCGnZiPpGJatyZ7mfqYU';
+    //创建Cesium Viewer
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      // animation: false, //动画控制
+      baseLayerPicker: false, //图层选择控件
+      // fullscreenButton: false, //全屏按钮
+    });
+    //加载arcgis的地图
+    const arcgismap = new Cesium.ArcGISMapServerImageryProvider({
+      url: 'https://services.arcgis.com/ArcGIS/rest/services/World_Imagery/MapServer',
+    });
+    viewer.imageryLayers.addImageryProvider(arcgismap);
+
+
+    //-----------------------------------------------------------------------------
+    // // 从cesium ion 网页请求数据。“my assets”
+    // const layer = viewer.imageryLayers.addImageryProvider(
+    //   await Cesium.IonImageryProvider.fromAssetId(3812),
+    // );
+    // //--------------------------------------------------------------
+    // 使用 async 函数处理异步操作
+    // async function addIonLayer() {
+    //   try {
+    //     const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(3812);
+    //     const layer = viewer.imageryLayers.addImageryProvider(imageryProvider);
+    //     console.log('Ion图层加载成功');
+    //   } catch (error) {
+    //     console.error('加载Ion图层失败:', error);
+    //   }
+    // }
+
+    // // 调用函数
+    // addIonLayer();
+    //--------------------------------------------------------------
+    //加载地形数据
+    
+
+     (async () => {
+        try {
+          const terrainProvider = await Cesium.IonTerrainProvider.fromIonAssetId(1);
+          viewer.scene.setTerrain(new Cesium.Terrain(terrainProvider));
+          console.log('✅ 地形加载成功');
+        } catch (err) {
+          console.error('❌ 地形加载失败:', err);
+        }
+      })();
+
+
+
+
+  </script>
+
+
+
+
+</body>
+
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="../lib/Cesium/Cesium.js"></script> <!-- bulid文件夹下的Cesium.js,是核心功能的js文件 -->
+  <link rel="stylesheet" href="../lib/Cesium/Widgets/widgets.css"> <!-- //核心样式 -->
+  <style>
+    html,body,#cesiumContainer{
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <script>
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZDE2NTBjZi1jNGIyLTRlYmQtOTE5NS1iMGEzMjZkYzY2ZDciLCJpZCI6MzcxODU1LCJpYXQiOjE3NzU2MzYwOTF9.-vafpENPNz2ukkC8Y9Y3iDJdCGnZiPpGJatyZ7mfqYU';
+    //创建Cesium Viewer
+    const viewer = new Cesium.Viewer('cesiumContainer');
+
+//Entity是Cesium中表示场景中对象的类，可以通过viewer.entities来访问和操作实体集合
+//Entity可以表示各种类型的对象，如点、线、面、模型等，可以通过设置实体的属性来控制其外观和行为，如位置、颜色、大小、动画等
+//Entity可以通过viewer.entities.add()方法来添加到场景中，也可以通过viewer.entities.remove()方法来从场景中移除，还可以通过viewer.entities.getById()方法来获取特定ID的实体
+//Entity是Cesium中表示场景中对象的类，可以通过viewer.entities来访问
+
+const entity = viewer.entities.add({ // 创建一个实体(entity)并添加到查看器(viewer)中
+  name: '北京', // 实体名称设置为"北京"
+  position: Cesium.Cartesian3.fromDegrees(116.407396, 39.904200,400), // 使用经纬度坐标设置实体位置(北京的大致坐标)
+  point: { // 点的属性设置
+    pixelSize: 10,   // 点的大小为10像素
+    color: Cesium.Color.RED // 点的颜色设置为红色
+  }
+});
+  viewer.trackedEntity = entity; //跟踪实体，使相机始终朝向实体
+
+
+  </script>
+</head>
+<body>
+
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cesium 本地地形加载器 (终极稳定版)</title>
+
+  <!-- 1. 优先加载 CSS -->
+  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Microsoft YaHei', sans-serif;
+      background: #000;
+    }
+
+    #sidebar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 999;
+      width: 320px;
+      height: 100%;
+      background: rgba(24, 26, 32, 0.96);
+      color: #eee;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      border-right: 1px solid #333;
+      transition: transform 0.3s ease;
+      overflow-y: auto;
+      /* 防止内容过多时溢出 */
+    }
+
+    #sidebar.collapsed {
+      transform: translateX(-320px);
+    }
+
+    #toggleBtn {
+      position: absolute;
+      top: 12px;
+      right: -36px;
+      z-index: 1000;
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 0 6px 6px 0;
+      background: rgba(24, 26, 32, 0.96);
+      color: #4fc3f7;
+      font-size: 18px;
+      cursor: pointer;
+      border: 1px solid #333;
+      border-left: none;
+    }
+
+    #sidebar h2 {
+      font-size: 17px;
+      color: #4fc3f7;
+    }
+
+    .btn-group {
+      margin-top: 10px;
+    }
+
+    label.file-label {
+      display: block;
+      padding: 12px;
+      text-align: center;
+      background: #1976d2;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    #status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      min-height: 60px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    #status.success {
+      color: #81c784;
+    }
+
+    #status.error {
+      color: #e57373;
+    }
+
+    #status.info {
+      color: #ffb74d;
+    }
+
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .cesium-viewer-errorPanel {
+      display: none !important;
+    }
+
+    /* ⭐ 新增：坐标输入框样式 */
+    .coord-input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      background: #2a2d35;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 4px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .coord-input:focus {
+      border-color: #4fc3f7;
+    }
+
+    .fly-btn {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: #388e3c;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .fly-btn:hover {
+      background: #43a047;
+    }
+
+    .fly-btn:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="sidebar">
+    <button id="toggleBtn"
+      onclick="this.parentElement.classList.toggle('collapsed'); this.textContent = this.parentElement.classList.contains('collapsed') ? '▶' : '◀'">◀</button>
+    <h2>🌍 本地地形加载器</h2>
+    <p style="font-size:12px; color:#999;">选择包含 <code style="color:#81c784;">layer.json</code> 的地形文件夹。</p>
+
+    <div class="btn-group">
+      <label class="file-label" for="terrainFolder">📂 选择地形文件夹</label>
+      <input type="file" id="terrainFolder" webkitdirectory directory multiple>
+    </div>
+
+    <!-- ⭐ 新增：坐标输入区域 -->
+    <div style="border-top: 1px solid #333; padding-top: 14px; margin-top: 4px;">
+      <h3 style="font-size: 14px; color: #4fc3f7; margin-bottom: 10px;">📍 坐标定位</h3>
+      <div style="display: flex; gap: 10px;">
+        <div style="flex: 1;">
+          <label style="font-size: 12px; color: #aaa;">经度 (Lon)</label>
+          <input type="number" id="inputLon" class="coord-input" step="any" placeholder="如: 116.39">
+        </div>
+        <div style="flex: 1;">
+          <label style="font-size: 12px; color: #aaa;">纬度 (Lat)</label>
+          <input type="number" id="inputLat" class="coord-input" step="any" placeholder="如: 39.90">
+        </div>
+      </div>
+      <button id="flyToBtn" class="fly-btn" disabled>🚀 飞行到该坐标</button>
+    </div>
+
+    <div id="status" class="info">⏳ 等待选择...</div>
+  </div>
+
+  <div id="cesiumContainer" class="notranslate" translate="no"></div>
+
+  <!-- 2. 后加载 JS -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+  <script>
+    // ========== 1. 初始化 Viewer (终极防御版) ==========
+    Cesium.buildModuleUrl.setBaseUrl('https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/');
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZDE2NTBjZi1jNGIyLTRlYmQtOTE5NS1iMGEzMjZkYzY2ZDciLCJpZCI6MzcxODU1LCJpYXQiOjE3NzU2MzYwOTF9.-vafpENPNz2ukkC8Y9Y3iDJdCGnZiPpGJatyZ7mfqYU';
+
+    const safeCreditDiv = document.createElement('div');
+    safeCreditDiv.style.cssText = 'position:absolute; top:-9999px; left:-9999px; width:1px; height:1px; overflow:hidden;';
+    document.body.appendChild(safeCreditDiv);
+
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      animation: false, baseLayerPicker: false, geocoder: false, homeButton: false,
+      sceneModePicker: false, navigationHelpButton: false, timeline: false,
+      fullscreenButton: false, infoBox: false, selectionIndicator: false,
+      creditContainer: safeCreditDiv,
+      terrainProvider: new Cesium.EllipsoidTerrainProvider()
+    });
+
+    if (viewer.cesiumWidget && viewer.cesiumWidget.creditContainer) {
+      viewer.cesiumWidget.creditContainer.style.display = 'none';
+    }
+
+    const statusEl = document.getElementById('status');
+    const setStatus = (msg, type = 'info') => {
+      statusEl.textContent = msg;
+      statusEl.className = type;
+    };
+
+    // ========== 2. 核心拦截逻辑 ==========
+    let localBlobMap = new Map();
+    const VIRTUAL_URL_PREFIX = 'http://local-terrain-mock/';
+
+    const originalFetch = Cesium.Resource.prototype.fetch;
+    Cesium.Resource.prototype.fetch = function (options) {
+      try {
+        if (this.url && this.url.startsWith(VIRTUAL_URL_PREFIX)) {
+          let relativePath = this.url.replace(VIRTUAL_URL_PREFIX, '');
+          const queryIndex = relativePath.indexOf('?');
+          if (queryIndex !== -1) relativePath = relativePath.substring(0, queryIndex);
+          if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
+
+          const blobUrl = localBlobMap.get(relativePath);
+
+          if (blobUrl) {
+            return fetch(blobUrl).then(response => {
+              const responseType = options?.responseType || this.responseType;
+              if (responseType === 'json') return response.json();
+              if (responseType === 'arraybuffer') return response.arrayBuffer();
+              if (responseType === 'blob') return response.blob();
+              if (responseType === 'text') return response.text();
+              return response;
+            });
+          } else {
+            return Promise.resolve(new Response(null, { status: 404, statusText: 'Not Found' }));
+          }
+        }
+      } catch (e) { console.error(e); }
+      return originalFetch.call(this, options);
+    };
+
+    // ========== 3. 地形加载逻辑 ==========
+    async function loadTerrainFromFolder(fileList) {
+      setStatus('🔍 扫描中...', 'info');
+
+      let layerJsonFile = null;
+      let rootPrefix = '';
+
+      localBlobMap.forEach(url => URL.revokeObjectURL(url));
+      localBlobMap.clear();
+
+      for (const file of fileList) {
+        const relPath = file.webkitRelativePath.replace(/\\/g, '/');
+        if (relPath.endsWith('/layer.json')) {
+          layerJsonFile = file;
+          rootPrefix = relPath.replace(/layer\.json$/, '');
+        }
+      }
+
+      if (!layerJsonFile) {
+        setStatus('❌ 未找到 layer.json', 'error');
+        return;
+      }
+
+      for (const file of fileList) {
+        let relPath = file.webkitRelativePath.replace(/\\/g, '/');
+        const normalizedPath = relPath.startsWith(rootPrefix) ? relPath.slice(rootPrefix.length) : relPath;
+        localBlobMap.set(normalizedPath, URL.createObjectURL(file));
+      }
+
+      setStatus(`📦 索引 ${localBlobMap.size} 个文件...`, 'info');
+
+      try {
+        const provider = await Cesium.CesiumTerrainProvider.fromUrl(VIRTUAL_URL_PREFIX);
+        viewer.terrainProvider = provider;
+        viewer.scene.requestRender();
+
+        setStatus(`✅ 加载成功！\n瓦片数: ${localBlobMap.size}`, 'success');
+
+        // ⭐ 地形加载成功后，启用飞行按钮
+        document.getElementById('flyToBtn').disabled = false;
+
+        if (provider._rectangle) {
+          viewer.camera.flyTo({ destination: provider._rectangle, duration: 1.5 });
+        }
+      } catch (err) {
+        setStatus(`❌ 失败: ${err.message}`, 'error');
+        console.error(err);
+      }
+    }
+
+    document.getElementById('terrainFolder').addEventListener('change', async (e) => {
+      if (e.target.files.length > 0) await loadTerrainFromFolder(e.target.files);
+    });
+
+    // ========== 4. ⭐ 新增：坐标输入与飞行逻辑 ==========
+    // 定义全局变量
+    let longitude = null;
+    let latitude = null;
+
+    const inputLon = document.getElementById('inputLon');
+    const inputLat = document.getElementById('inputLat');
+    const flyToBtn = document.getElementById('flyToBtn');
+
+    // 监听输入框变化，实时赋值给变量
+    inputLon.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      longitude = isNaN(val) ? null : val;
+    });
+
+    inputLat.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      latitude = isNaN(val) ? null : val;
+    });
+
+    // 点击按钮飞行到指定坐标
+    flyToBtn.addEventListener('click', () => {
+      if (longitude === null || latitude === null) {
+        alert('⚠️ 请输入有效的经度和纬度！');
+        return;
+      }
+
+      // 经度范围 -180 到 180，纬度范围 -90 到 90
+      if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
+        alert('⚠️ 坐标范围错误！\n经度: -180~180\n纬度: -90~90');
+        return;
+      }
+
+      console.log(`🚀 正在飞行到: 经度 ${longitude}, 纬度 ${latitude}`);
+
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 500), // 默认高度 5000 米
+        orientation: {
+          heading: Cesium.Math.toRadians(0),   // 朝向正北
+          pitch: Cesium.Math.toRadians(-45),   // 俯视角 45 度
+          roll: 0.0
+        },
+        duration: 2.0 // 飞行动画持续 2 秒
+      });
+    });
+  </script>
+</body>
+
+</html>

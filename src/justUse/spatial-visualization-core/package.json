@@ -1,0 +1,79 @@
+{
+  "name": "spatial-visualization-core",
+  "version": "1.0.0",
+  "description": "空间信息可视化核心库 - 风场、林火蔓延、高斯泼溅统一平台",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:shaders": "node scripts/build-shaders.js",
+    "test": "vitest",
+    "lint": "eslint src/",
+    "docs": "jsdoc -c jsdoc.config.json"
+  },
+  "keywords": [
+    "cesium",
+    "wind-field",
+    "fire-spread",
+    "gaussian-splatting",
+    "spatial-visualization",
+    "particle-system"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "dependencies": {
+    "@mkkellogg/gaussian-splats-3d": "^0.4.7",
+    "cesium": ">=1.100.0",
+    "dat.gui": "^0.7.9",
+    "netcdfjs": "^1.0.0",
+    "ply2splat": "^0.4.4",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "jsdoc": "^4.0.0",
+    "vite": "^5.2.0",
+    "vite-plugin-cesium": "^1.2.22",
+    "vitest": "^1.0.0"
+  },
+  "peerDependencies": {
+    "cesium": ">=1.100.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/index.d.ts"
+    },
+    "./wind": {
+      "import": "./src/modules/wind/index.js",
+      "types": "./src/modules/wind/index.d.ts"
+    },
+    "./fire": {
+      "import": "./src/modules/fire/index.js",
+      "types": "./src/modules/fire/index.d.ts"
+    },
+    "./splat": {
+      "import": "./src/modules/splat/index.js",
+      "types": "./src/modules/splat/index.d.ts"
+    },
+    "./core": {
+      "import": "./src/core/index.js",
+      "types": "./src/core/index.d.ts"
+    },
+    "./utils": {
+      "import": "./src/utils/index.js",
+      "types": "./src/utils/index.d.ts"
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ]
+}

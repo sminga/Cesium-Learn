@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spatial Visualization Core - 空间信息可视化核心库</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    }
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .panel {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      padding: 24px;
+      background: linear-gradient(135deg, rgba(2, 9, 45, 0.95) 0%, rgba(10, 25, 60, 0.95) 100%);
+      box-shadow: 0 0 20px rgba(20, 122, 216, 0.4), inset 0 0 15px rgba(20, 122, 216, 0.2);
+      border-radius: 12px;
+      color: white;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(20, 122, 216, 0.3);
+      width: 320px;
+    }
+    
+    .panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .panel::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+    
+    .panel::-webkit-scrollbar-thumb {
+      background: rgba(20, 122, 216, 0.5);
+      border-radius: 3px;
+    }
+    
+    .section {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #4fc3f7;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 16px;
+      background: linear-gradient(180deg, #4fc3f7, #0288d1);
+      border-radius: 2px;
+    }
+    
+    .loadData {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .nc, .json {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 16px;
+      font-size: 14px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    
+    h4 {
+      margin: 0 0 14px 0;
+      color: #2196f3;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+    
+    #fileInput {
+      margin: 12px 0;
+      display: block;
+      color: #fff;
+    }
+    
+    #fileInput::file-selector-button {
+      background: linear-gradient(135deg, #1a253d 0%, #0d1a30 100%);
+      border: 1px solid rgba(20, 122, 216, 0.5);
+      padding: 8px 16px;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.3s ease;
+    }
+    
+    #fileInput::file-selector-button:hover {
+      background: linear-gradient(135deg, #1e496f 0%, #0d2a4a 100%);
+      box-shadow: 0 0 15px rgba(20, 122, 216, 0.4);
+    }
+    
+    #panelContainer {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      margin-top: 12px;
+    }
+    
+    #fieldsPanelContainer,
+    #valueRangePanelContainer,
+    #offsetPanelContainer,
+    #vortexPanelContainer,
+    #mapProviderPanelContainer {
+      padding-bottom: 12px;
+      margin-bottom: 8px;
+    }
+    
+    #mapSettingsContainer {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      margin-top: 12px;
+    }
+    
+    .dg.main {
+      margin-top: 8px;
+    }
+    
+    .dg.main .close-button {
+      margin-top: 4px;
+    }
+    
+    .buttons {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    
+    .buttons button {
+      flex: 1;
+      min-width: 70px;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #1a253d 0%, #0d1a30 100%);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(20, 122, 216, 0.4);
+      height: 36px;
+      padding: 0 20px;
+      font-size: 14px;
+      border-radius: 18px;
+      color: #fff;
+      font-weight: 400;
+      white-space: nowrap;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+    }
+    
+    button:hover:not(:disabled) {
+      background: linear-gradient(135deg, #1e496f 0%, #0d2a4a 100%);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 20px rgba(20, 122, 216, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    button:focus:not(:disabled) {
+      outline: none;
+      background: linear-gradient(135deg, #075ab3 0%, #043a7a 100%);
+      border-color: #075ab3;
+    }
+    
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    
+    button:disabled {
+      color: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: transparent;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    
+    button.active {
+      background: linear-gradient(135deg, #0288d1 0%, #01579b 100%);
+      border-color: #4fc3f7;
+    }
+    
+    .status-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: linear-gradient(135deg, rgba(2, 9, 45, 0.95) 0%, rgba(10, 25, 60, 0.95) 100%);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 1000;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      box-shadow: 0 0 15px rgba(20, 122, 216, 0.3);
+      border: 1px solid rgba(20, 122, 216, 0.2);
+      display: flex;
+      gap: 20px;
+    }
+    
+    .status-bar .item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .status-bar .label {
+      color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .status-bar .value {
+      color: #2196f3;
+      font-weight: 500;
+    }
+    
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(2, 9, 45, 0.98) 0%, rgba(10, 25, 60, 0.98) 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      color: #fff;
+      font-size: 18px;
+    }
+    
+    .loading-overlay.hidden {
+      display: none;
+    }
+    
+    .loading-content {
+      text-align: center;
+    }
+    
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(33, 150, 243, 0.2);
+      border-top-color: #2196f3;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .dg.main {
+      font-family: 'Microsoft YaHei', sans-serif !important;
+    }
+    
+    .dg.main .close-button {
+      background: linear-gradient(135deg, #1a253d 0%, #0d1a30 100%) !important;
+      border-radius: 0 0 6px 6px !important;
+    }
+    
+    .dg.main .close-button:hover {
+      background: linear-gradient(135deg, #1e496f 0%, #0d2a4a 100%) !important;
+    }
+    
+    .dg li.title {
+      background: linear-gradient(135deg, #1a253d 0%, #0d1a30 100%) !important;
+      text-shadow: none !important;
+    }
+    
+    .dg li:not(.title) {
+      background: rgba(255, 255, 255, 0.05) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    .dg li:not(.title):hover {
+      background: rgba(33, 150, 243, 0.1) !important;
+    }
+    
+    .dg .cr.function:hover, .dg .cr.boolean:hover {
+      background: rgba(33, 150, 243, 0.15) !important;
+    }
+    
+    .fire-panel, .splat-panel {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      margin-top: 8px;
+    }
+    
+    .fire-panel h4, .splat-panel h4 {
+      color: #ff7043;
+      margin-bottom: 16px;
+    }
+    
+    .splat-panel h4 {
+      color: #ab47bc;
+    }
+    
+    .control-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    
+    .control-row button {
+      flex: 1;
+      min-height: 36px;
+    }
+    
+    .param-group {
+      margin-top: 16px;
+    }
+    
+    .param-group label {
+      display: block;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 6px;
+    }
+    
+    .param-group input, .param-group select {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: #fff;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    
+    .param-group input:focus, .param-group select:focus {
+      outline: none;
+      border-color: #4fc3f7;
+    }
+    
+    .param-group select option {
+      background: #1a253d;
+    }
+    
+    .info-text {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 12px;
+    }
+    
+    @media (max-width: 768px) {
+      .panel {
+        left: 10px;
+        top: 10px;
+        padding: 15px;
+        max-width: calc(100vw - 20px);
+        font-size: 13px;
+        width: auto;
+      }
+      
+      .buttons {
+        flex-direction: column;
+      }
+      
+      button {
+        width: 100%;
+      }
+      
+      .status-bar {
+        left: 10px;
+        bottom: 10px;
+        right: 10px;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div>正在加载 Cesium 和风场数据...</div>
+      <div id="loadingStatus" style="margin-top: 10px; font-size: 14px; color: rgba(255,255,255,0.6);"></div>
+    </div>
+  </div>
+  
+  <div id="cesiumContainer"></div>
+  
+  <div class="panel">
+    <div class="section">
+      <div class="section-title">风场可视化</div>
+      <div class="loadData">
+        <div class="nc">
+          <h4>加载本地风场数据</h4>
+          <input id="fileInput" type="file" accept=".nc,.nc3,.nc4">
+          <div id="fieldsPanelContainer"></div>
+          <div id="valueRangePanelContainer"></div>
+          <div id="offsetPanelContainer"></div>
+          <div class="buttons">
+            <button id="load" disabled>加载文件</button>
+          </div>
+        </div>
+        <div class="json">
+          <h4>三维风场分层</h4>
+          <div id="vortexPanelContainer"></div>
+          <div class="buttons">
+            <button id="generateData">生成数据</button>
+            <button id="delamination" disabled>取消分层</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">地图设置</div>
+      <div id="mapSettingsContainer">
+        <h4>地图服务设置</h4>
+        <div id="mapProviderPanelContainer"></div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">粒子参数</div>
+      <div id="panelContainer">
+        <h4>粒子系统参数设置</h4>
+      </div>
+      <div class="buttons">
+        <button id="statechange" disabled>显示</button>
+        <button id="remove" disabled>移除</button>
+        <button id="Initializeperspective">初始化视角</button>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">林火蔓延模拟</div>
+      <div class="fire-panel">
+        <h4>火场控制</h4>
+        <div class="param-group">
+          <label>燃料模型</label>
+          <select id="fuelModelSelect">
+            <option value="1">1 - 短草</option>
+            <option value="2">2 - 木材/草地</option>
+            <option value="3">3 - 高草</option>
+            <option value="4">4 - 灌木丛</option>
+            <option value="5">5 - 灌木</option>
+            <option value="6">6 - 矮灌木</option>
+            <option value="7">7 - 木材/灌木</option>
+            <option value="8">8 - 封闭木材</option>
+            <option value="9">9 - 硬木</option>
+            <option value="10">10 - 木材/落叶</option>
+            <option value="11">11 - 轻型伐木</option>
+            <option value="12">12 - 中型伐木</option>
+            <option value="13">13 - 重型伐木</option>
+          </select>
+        </div>
+        <div class="param-group">
+          <label>风速 (m/s)</label>
+          <input type="number" id="fireWindSpeed" value="5" min="0" max="50" step="0.5">
+        </div>
+        <div class="param-group">
+          <label>风向 (度)</label>
+          <input type="number" id="fireWindDir" value="0" min="0" max="360" step="15">
+        </div>
+        <div class="param-group">
+          <label>湿度 (%)</label>
+          <input type="number" id="fireMoisture" value="10" min="0" max="100" step="5">
+        </div>
+        <div class="control-row">
+          <button id="fireInit">初始化</button>
+          <button id="fireIgnite" disabled>点火</button>
+        </div>
+        <div class="control-row">
+          <button id="fireStart" disabled>开始蔓延</button>
+          <button id="fireStop" disabled>停止</button>
+        </div>
+        <div class="control-row">
+          <button id="fireReset" disabled>重置</button>
+          <button id="fireExport" disabled>导出</button>
+        </div>
+        <div class="info-text">点击地图选择点火位置</div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">高斯泼溅</div>
+      <div class="splat-panel">
+        <h4>模型控制</h4>
+        <div class="param-group">
+          <label>模型文件 (.ply/.splat)</label>
+          <input type="file" id="splatFileInput" accept=".ply,.splat">
+        </div>
+        <div class="param-group">
+          <label>位置 (经度, 纬度)</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="number" id="splatLon" placeholder="经度" value="116.0" step="0.0001">
+            <input type="number" id="splatLat" placeholder="纬度" value="40.0" step="0.0001">
+          </div>
+        </div>
+        <div class="param-group">
+          <label>高度 (米)</label>
+          <input type="number" id="splatHeight" value="0" step="10">
+        </div>
+        <div class="param-group">
+          <label>缩放比例</label>
+          <input type="number" id="splatScale" value="1" min="0.01" max="100" step="0.1">
+        </div>
+        <div class="control-row">
+          <button id="splatInit">初始化</button>
+          <button id="splatLoad" disabled>加载模型</button>
+        </div>
+        <div class="control-row">
+          <button id="splatShow" disabled>显示</button>
+          <button id="splatHide" disabled>隐藏</button>
+        </div>
+        <div class="control-row">
+          <button id="splatRemove" disabled>移除</button>
+        </div>
+        <div class="control-row">
+          <button id="splatLocate" disabled>定位模型</button>
+        </div>
+        <div id="locateStatusContainer"></div>
+        <div class="param-group">
+          <label>代理服务器</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="proxyHost" placeholder="主机" value="127.0.0.1" style="flex: 2;">
+            <input type="number" id="proxyPort" placeholder="端口" value="29290" style="flex: 1;">
+          </div>
+        </div>
+        <div class="control-row">
+          <button id="testProxy">测试连接</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="status-bar">
+    <div class="item">
+      <span class="label">FPS:</span>
+      <span class="value" id="fps">0</span>
+    </div>
+    <div class="item">
+      <span class="label">粒子:</span>
+      <span class="value" id="particleCount">0</span>
+    </div>
+    <div class="item">
+      <span class="label">风场数据:</span>
+      <span class="value" id="windDataStatus">未加载</span>
+    </div>
+    <div class="item">
+      <span class="label">火场状态:</span>
+      <span class="value" id="fireStatus">未初始化</span>
+    </div>
+  </div>
+
+  <script type="module" src="/demo/main.js"></script>
+</body>
+</html>
