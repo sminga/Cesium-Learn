@@ -1,3 +1,62 @@
+/**
+ * ============================================================================
+ * Cesium 坐标与相机控制工具模块 (latlng) 速查表
+ * ============================================================================
+ * 
+ * 1. getCurrentMousePosition(scene, position, noPickEntity)
+ *    - 功能：获取鼠标当前位置的三维笛卡尔坐标（支持地形、模型、3D Tiles 深度拾取）
+ *    - 参数：scene(Cesium.Scene), position(Cartesian2), noPickEntity(Entity, 可选)
+ *    - 返回：Cesium.Cartesian3
+ * 
+ * 2. getCenter(viewer)
+ *    - 功能：获取当前地球视图的中心点坐标及相机距离
+ *    - 参数：viewer(Cesium.Viewer)
+ *    - 返回：{x: 经度, y: 纬度, z: 高度, cameraZ: 距离}
+ * 
+ * 3. getExtent(viewer)
+ *    - 功能：获取当前视域的经纬度矩形边界（通过四角射线求交计算）
+ *    - 参数：viewer(Cesium.Viewer)
+ *    - 返回：{xmin: 最西, xmax: 最东, ymin: 最南, ymax: 最北}
+ * 
+ * 4. getViewBounds(viewer)
+ *    - 功能：获取当前视域边界（使用 Cesium 内置计算，返回西南/东北角）
+ *    - 参数：viewer(Cesium.Viewer)
+ *    - 返回：{southwest: {lng, lat}, northeast: {lng, lat}}
+ * 
+ * 5. getCameraView(viewer)
+ *    - 功能：提取当前相机的 6DOF 视角参数（常用于保存视角书签）
+ *    - 参数：viewer(Cesium.Viewer)
+ *    - 返回：{x: 经度, y: 纬度, z: 高度, heading, pitch, roll} (角度制)
+ * 
+ * 6. formatPositon(position)
+ *    - 功能：将三维笛卡尔坐标格式化为可读的经纬度对象
+ *    - 参数：position(Cesium.Cartesian3)
+ *    - 返回：{x: 经度, y: 纬度, z: 高度}
+ * 
+ * 7. Cartesian3To(cartesian3, viewer)
+ *    - 功能：将笛卡尔坐标一次性转换为多种格式（笛卡尔、弧度、经纬度）
+ *    - 参数：cartesian3(Cesium.Cartesian3), viewer(Cesium.Viewer, 可选)
+ *    - 返回：{cartesian3, cartographic, latlng: {lat, lng, height}}
+ * 
+ * 8. windingPoint.start(viewer, point) / .stop()
+ *    - 功能：相机绕指定目标点进行环绕飞行（公转）
+ *    - 参数：viewer(Cesium.Viewer), point({x: 经度, y: 纬度, z: 高度, time: 秒数, distance: 距离})
+ * 
+ * 9. aroundPoint.start(viewer, point) / .stop()
+ *    - 功能：相机在原地绕自身轴心旋转（自转/转头）
+ *    - 参数：viewer(Cesium.Viewer), point({x: 经度, y: 纬度, z: 高度, time: 秒数})
+ *    - ⚠️ 注意：源码中 clock_onTickHandler 内的 viewer 需改为 this.viewer
+ * 
+ * 10. getFrustumGroundIntersectionPoints(viewer)
+ *     - 功能：获取当前视锥体与地面的 4 个交点（2个实际交点 + 2个turf推算点）
+ *     - 参数：viewer(Cesium.Viewer)
+ *     - 返回：Array<{x: 经度, y: 纬度}>
+ *     - ⚠️ 注意：此方法依赖 turf.js 库，使用前需确保已引入
+ * ============================================================================
+ */
+
+
+
 var latlng = {};
 /**
  * 获取鼠标当前的屏幕坐标位置的三维Cesium坐标
