@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="./../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../libs/cesium/Cesium.js"></script>
+  <script src="./../../libs/JS/latlng.js"></script>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="cesiumContainer" style="margin: 0 auto; width: 100%; height: 100%"></div>
+  <script type="text/javascript">
+    //教程：https://blog.csdn.net/qq_28372005/article/details/159215052
+
+    // --- 在 <script> 标签内编写以下代码 ---
+
+    // 1. 填入你自己的天地图浏览器端Key
+    //const tdtToken = 'YOUR_TDT_TOKEN_HERE'; // 请替换为你在天地图申请的Key
+    const tdtToken = '8c2b8afdfd321dbe7a98d7f78680ab52'; // 请替换为你在天地图申请的Key
+
+    // 2. 初始化Cesium Viewer
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      // 简化UI，让界面更清爽
+      baseLayerPicker: false,   // 关闭底图选择器
+      geocoder: false,          // 关闭地理编码器
+      homeButton: true,
+      sceneModePicker: true,
+      navigationHelpButton: false,
+      animation: false,
+      timeline: false,
+      fullscreenButton: false
+    });
+
+    //3. 开始叠加多个图层
+    //3.1 其实就是加载多个图层，和05_01没区别
+    //3.2 注记必须配对	img_w+cia_w、vec_w+cva_w、ter_w+cta_w，配错会看不清文字
+
+    // 天地图影像底图（卫星图）
+    const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+      //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+      //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+      url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+      layer: "img",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+    viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+
+
+    // 天地图影像注记（卫星图上的标注）
+    const tiandituCiaLayer = new Cesium.WebMapTileServiceImageryProvider({
+      //url: "https://t0.tianditu.gov.cn/cia_w/wmts?tk=你的Key", //修改成自己的token
+      url: "https://t0.tianditu.gov.cn/cia_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+      layer: "cia",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+
+
+    // 天地图矢量底图（街道图）
+    const vecLayer = new Cesium.WebMapTileServiceImageryProvider({
+      url: "https://t{s}.tianditu.gov.cn/vec_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+      subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+      layer: "vec",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+
+
+
+    //地形晕渲 ter_w（山体光影）
+    const terLayer = new Cesium.WebMapTileServiceImageryProvider({
+      url: "https://t{s}.tianditu.gov.cn/ter_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+      subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+      layer: "ter",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+
+
+    // 矢量注记 cva_w（⚠️ 必须先有 vec_w 底图）
+    const cvaLayer = new Cesium.WebMapTileServiceImageryProvider({
+      url: "https://t{s}.tianditu.gov.cn/cva_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+      subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+      layer: "cva",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+
+
+
+    // 地形注记 cta_w（⚠️ 必须先有 ter_w 地形晕渲底图）
+    const ctaLayer = new Cesium.WebMapTileServiceImageryProvider({
+      url: "https://t{s}.tianditu.gov.cn/cta_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+      subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+      layer: "cta",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+
+
+    //注记必须配对	img_w+cia_w、vec_w+cva_w、ter_w+cta_w，配错会看不清文字
+
+    // 4. 将底图图层添加到Viewer中
+    viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+
+    // 4. 将注记图层添加到Viewer中
+    viewer.imageryLayers.addImageryProvider(tiandituCiaLayer);
+
+    //4.矢量底图（街道图）
+    // viewer.imageryLayers.addImageryProvider(vecLayer);
+
+    //4.地形晕渲 ter_w（山体光影）
+    // viewer.imageryLayers.addImageryProvider(terLayer);
+
+    //4. 矢量注记 cva_w（⚠️ 必须先有 vec_w 底图）
+    // viewer.imageryLayers.addImageryProvider(cvaLayer);  // 后添加，盖在矢量图上面
+
+    //4.cta_w 地形注记
+    viewer.imageryLayers.addImageryProvider(ctaLayer);  // 后添加，盖在地形图上面
+
+    // 5. 可选：移除Cesium默认加载的底图（如果不移除，会有两层底图）
+    viewer.imageryLayers.remove(viewer.imageryLayers.get(0));
+
+    // 6. 设置初始视角（比如定位到北京）
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(116.397, 39.907, 5000000) // 经度, 纬度, 高度（米）
+    });
+
+    console.log('✅ 天地图影像加载成功！');
+
+
+
+
+  </script>
+</body>
+
+</html>

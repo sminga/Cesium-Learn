@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 
@@ -19,12 +18,9 @@
     });
 
     var xyz = new Cesium.UrlTemplateImageryProvider({
-      "url": 'https://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c1e7bf15c41cc47dc8889ebe2399ced4'
+      "url": 'https://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=8c2b8afdfd321dbe7a98d7f78680ab52'
     })
     viewer.imageryLayers.addImageryProvider(xyz)
-
-    // 开启帧率
-    viewer.scene.debugShowFramesPerSecond = true;
 
 
     // 加载离线地形
@@ -38,32 +34,36 @@
 
 
     var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    handler.setInputAction(function (movement) {
 
-      // 1、屏幕坐标
-      console.log(movement.position);
+    handler.setInputAction(function (movement) { //handler.setInputAction(回调函数:触发后执行什么？, 事件类型:什么事件触发?);
+
+      // 1、屏幕坐标,原点：左上角,单位：像素, 这是所有后续计算的起点
+      console.log('屏幕坐标：', movement.position);
 
       // 2、椭球面坐标（不包含地形、模型、倾斜摄影表面。）
-      var position = viewer.scene.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
-      console.log(position);
-      // 经纬度坐标
-      var cartesian3 = new Cesium.Cartesian3(position.x, position.y, position.z)
-      var cartographic = viewer.scene.globe.ellipsoid.cartesianToCartographic(cartesian3);
+      var position = viewer.scene.camera.pickEllipsoid(
+        movement.position,// 屏幕坐标
+        viewer.scene.globe.ellipsoid);  // WGS84 椭球体
+      console.log('WGS84 椭球体坐标：',position);
+
+      // 3、经纬度坐标
+      var cartesian3 = new Cesium.Cartesian3(position.x, position.y, position.z) //将椭球面坐标转换为笛卡尔坐标
+      var cartographic = viewer.scene.globe.ellipsoid.cartesianToCartographic(cartesian3); // 将笛卡尔坐标转换为弧度,地理坐标
       var lat = Cesium.Math.toDegrees(cartographic.latitude);
       var lng = Cesium.Math.toDegrees(cartographic.longitude);
-      console.log(lng, lat)
+      console.log('经纬度坐标：',lng, lat)
 
       // 3、场景坐标（包含了地形、倾斜摄影表面、模型的坐标）
       // 只有在开启地形深度检测viewer.scene.globe.depthTestAgainstTerrain = true，且不使用默认地形时是准确的
       var position = viewer.scene.pickPosition(movement.position);
-      console.log(position);
+      console.log('场景坐标:',position);
 
       // 4、地表坐标（这里是地球表面的世界坐标，包含地形，不包括模型、倾斜摄影表面。）
       var ray = viewer.camera.getPickRay(movement.position);
       var position = viewer.scene.globe.pick(ray, viewer.scene);
-      console.log(position);
+      console.log('地表坐标:',position);
 
-    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);  //左键单击事件出发后进行函数调用
 
 
     // 扩展获取当前鼠标移动的位置
@@ -72,11 +72,21 @@
       // console.log(viewer.scene, movement.endPosition, null)
 
       // 获取当前坐标
-      console.log(latlng.getCurrentMousePosition(viewer.scene, movement.endPosition, null))
+      console.log(latlng.getCurrentMousePosition(
+        viewer.scene, 
+        movement.endPosition, null
+      ))
+
 
       // 获取当前坐标并转换为经纬度
-      console.log(latlng.Cartesian3To(latlng.getCurrentMousePosition(viewer.scene, movement.endPosition, null), viewer).latlng)
-    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+      console.log(
+        latlng.Cartesian3To(
+          latlng.getCurrentMousePosition(
+            viewer.scene, 
+            movement.endPosition, null), 
+            
+            viewer).latlng) //latng.js 
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);  //鼠标移动事件触发后进行函数调用
 
 
   </script>
