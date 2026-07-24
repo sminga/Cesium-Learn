@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>05 点击获得经纬度（控制台增强版）</title>
+  <link rel="stylesheet" href="./../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../libs/cesium/Cesium.js"></script>
+  <script src="./../../libs/JS/latlng.js"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+    rel="stylesheet"> // 引入google字体
+  <style>
+    :root {
+      --bg-deep: #0c1a1f;
+      --bg-panel: #10242b;
+      --bg-raised: #132e37;
+      --line: #23505c;
+      --line-soft: #1e4550;
+      --ink: #dcebe8;
+      --ink-dim: #7fa3a6;
+      --ink-faint: #5e8b93;
+      --amber: #ffb454;
+      --amber-hi: #ffd28a;
+      --green: #43e08c;
+      --red: #ff5d5d;
+      --mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
+      --disp: 'Chakra Petch', 'Noto Sans SC', sans-serif;
+      --body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: var(--body);
+      background: var(--bg-deep);
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    /* 地图边缘暗角，增加仪表感 */
+    #vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      background: radial-gradient(120% 90% at 50% 40%, transparent 62%, rgba(4, 12, 15, .38));
+    }
+
+    /* ============ 左侧控制台 ============ */
+    #panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 276px;
+      max-height: calc(100vh - 32px);
+      display: flex;
+      flex-direction: column;
+      color: var(--ink);
+      z-index: 10;
+      background:
+        radial-gradient(420px 260px at 110% -8%, rgba(255, 180, 84, .07), transparent 62%),
+        repeating-radial-gradient(circle at 130% 12%, transparent 0 30px, rgba(96, 150, 158, .10) 30px 31px),
+        repeating-radial-gradient(circle at -30% 105%, transparent 0 26px, rgba(96, 150, 158, .08) 26px 27px),
+        linear-gradient(160deg, #12262d, #0d1c22);
+      border: 1px solid var(--line);
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+      filter: drop-shadow(0 14px 28px rgba(0, 0, 0, .5));
+      transition: transform .4s cubic-bezier(.7, 0, .25, 1);
+    }
+
+    #panel.collapsed {
+      transform: translateX(calc(-100% - 28px));
+    }
+
+    /* 收起后露出的小标签 */
+    #panelTab {
+      position: absolute;
+      top: 14px;
+      left: calc(100% + 12px);
+      width: 38px;
+      height: 38px;
+      border: 1px solid #2a5a68;
+      background: #12262d;
+      color: var(--amber);
+      font-size: 18px;
+      cursor: pointer;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+      transition: .25s;
+    }
+
+    #panelTab:hover {
+      background: #1a3540;
+      color: var(--amber-hi);
+      transform: translateX(2px);
+    }
+
+    .p-head {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 14px 14px 12px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .reticle {
+      width: 34px;
+      height: 34px;
+      color: var(--amber);
+      flex: none;
+    }
+
+    .reticle .spin {
+      transform-origin: 20px 20px;
+      animation: rot 16s linear infinite;
+    }
+
+    @keyframes rot {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .p-head h1 {
+      margin: 0;
+      font: 700 16px/1 var(--disp);
+      letter-spacing: .14em;
+      color: #f2f7f5;
+    }
+
+    .p-head p {
+      margin: 3px 0 0;
+      font: 500 10px/1 var(--disp);
+      letter-spacing: .3em;
+      color: var(--ink-dim);
+    }
+
+    #collapseBtn {
+      margin-left: auto;
+      width: 26px;
+      height: 26px;
+      flex: none;
+      cursor: pointer;
+      background: none;
+      border: 1px solid #2a5a68;
+      color: var(--ink-dim);
+      font: 700 12px var(--disp);
+      transition: .2s;
+    }
+
+    #collapseBtn:hover {
+      color: var(--amber);
+      border-color: var(--amber);
+    }
+
+    .p-body {
+      overflow-y: auto;
+      min-height: 0;
+      padding: 4px 8px 8px;
+      flex: 1;
+    }
+
+    .p-body::-webkit-scrollbar,
+    #logList::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .p-body::-webkit-scrollbar-thumb,
+    #logList::-webkit-scrollbar-thumb {
+      background: #24505c;
+    }
+
+    .p-body::-webkit-scrollbar-thumb:hover,
+    #logList::-webkit-scrollbar-thumb:hover {
+      background: var(--amber);
+    }
+
+    .sec {
+      padding: 8px 6px 2px;
+    }
+
+    .sec-t {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0 4px;
+      font: 600 10px var(--disp);
+      letter-spacing: .22em;
+      color: var(--amber);
+    }
+
+    .sec-t b {
+      color: var(--ink-faint);
+      font-weight: 600;
+    }
+
+    .sec-t::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, #2a5a68, transparent);
+    }
+
+    /* ---- 拨动开关 ---- */
+    .sw {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+      transition: background .18s;
+    }
+
+    .sw:hover {
+      background: rgba(255, 180, 84, .07);
+    }
+
+    .sw input {
+      display: none;
+    }
+
+    .sw .track {
+      width: 34px;
+      height: 18px;
+      flex: none;
+      position: relative;
+      border-radius: 18px;
+      background: #17333c;
+      border: 1px solid #2a5a68;
+      transition: .25s;
+    }
+
+    .sw .knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--ink-faint);
+      transition: .28s cubic-bezier(.34, 1.7, .5, 1);
+    }
+
+    .sw input:checked+.track {
+      background: #5c3c10;
+      border-color: var(--amber);
+    }
+
+    .sw input:checked+.track .knob {
+      left: 18px;
+      background: var(--amber);
+      box-shadow: 0 0 9px rgba(255, 180, 84, .9);
+    }
+
+    .sw .txt {
+      font-size: 12.5px;
+      flex: 1;
+    }
+
+    .sw .txt small {
+      color: var(--ink-dim);
+      font-size: 10px;
+      margin-left: 5px;
+    }
+
+    /* ---- 复选框 ---- */
+    .ck {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+      transition: background .18s;
+    }
+
+    .ck:hover {
+      background: rgba(255, 180, 84, .07);
+    }
+
+    .ck input {
+      display: none;
+    }
+
+    .ck .box {
+      width: 15px;
+      height: 15px;
+      flex: none;
+      position: relative;
+      border-radius: 3px;
+      border: 1px solid #3a6b78;
+      background: #122a32;
+      transition: .2s;
+    }
+
+    .ck .box::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 5px;
+      height: 9px;
+      border: solid #0c1a1f;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg) scale(0);
+      transition: .2s cubic-bezier(.34, 1.7, .5, 1);
+    }
+
+    .ck input:checked+.box {
+      background: var(--amber);
+      border-color: var(--amber);
+    }
+
+    .ck input:checked+.box::after {
+      transform: rotate(45deg) scale(1);
+    }
+
+    .ck .txt {
+      font-size: 12.5px;
+    }
+
+    .ck .txt small {
+      display: block;
+      margin-top: 1px;
+      font-size: 10px;
+      color: var(--ink-dim);
+    }
+
+    /* ---- 按钮 ---- */
+    .btns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 6px 8px;
+    }
+
+    .btn {
+      font: 600 11px var(--disp);
+      letter-spacing: .12em;
+      padding: 9px 6px;
+      cursor: pointer;
+      background: var(--bg-raised);
+      color: var(--ink);
+      border: 1px solid #2a5a68;
+      transition: .2s;
+      clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    }
+
+    .btn:hover {
+      background: var(--amber);
+      border-color: var(--amber);
+      color: #122126;
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn.warn:hover {
+      background: var(--red);
+      border-color: var(--red);
+      color: #2a0d0d;
+    }
+
+    .btn:disabled {
+      opacity: .35;
+      pointer-events: none;
+    }
+
+    /* ---- 最近拾取卡片 ---- */
+    .last {
+      margin: 8px 8px 4px;
+      padding: 10px;
+      background: #0d2027;
+      border: 1px solid var(--line-soft);
+      border-left: 3px solid var(--amber);
+    }
+
+    .last h3 {
+      margin: 0 0 7px;
+      display: flex;
+      align-items: center;
+      font: 600 10px var(--disp);
+      letter-spacing: .24em;
+      color: var(--ink-dim);
+    }
+
+    .last h3 button {
+      margin-left: auto;
+      background: none;
+      border: 1px solid transparent;
+      color: var(--ink-faint);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 0 4px;
+      transition: .15s;
+    }
+
+    .last h3 button:hover:not(:disabled) {
+      color: var(--amber);
+      border-color: #2a5a68;
+    }
+
+    .last h3 button:disabled {
+      opacity: .3;
+      cursor: default;
+    }
+
+    .lp-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 3.5px 0;
+      border-top: 1px dashed #1a3a44;
+      font: 500 11px var(--mono);
+    }
+
+    .lp-row:first-of-type {
+      border-top: 0;
+    }
+
+    .lp-k {
+      color: #6f9aa2;
+      flex: none;
+    }
+
+    .lp-v {
+      color: var(--amber-hi);
+      text-align: right;
+      word-break: break-all;
+    }
+
+    .lp-empty {
+      padding: 6px 0;
+      font-size: 11px;
+      color: #4b7078;
+    }
+
+    .p-foot {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      border-top: 1px solid var(--line-soft);
+      font: 600 9.5px var(--disp);
+      letter-spacing: .2em;
+      color: var(--ink-dim);
+    }
+
+    .p-foot .keys {
+      margin-left: auto;
+      letter-spacing: .1em;
+    }
+
+    .p-foot .keys b {
+      color: var(--amber);
+    }
+
+    /* ---- LED 指示灯 ---- */
+    .led {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #274b55;
+      flex: none;
+      transition: .3s;
+    }
+
+    .led.on {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: blink 1.8s infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      55% {
+        opacity: .45;
+      }
+    }
+
+    /* ============ 右下：实时读数 ============ */
+    #readout {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      width: 284px;
+      z-index: 10;
+      padding: 12px 14px 10px;
+      border: 1px solid var(--line);
+      background: linear-gradient(150deg, #12262d, #0d1c22);
+      clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+      filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .45));
+    }
+
+    #readout.ping {
+      animation: ping .5s ease-out;
+    }
+
+    @keyframes ping {
+      0% {
+        box-shadow: inset 0 0 0 2px rgba(255, 180, 84, .9), inset 0 0 26px rgba(255, 180, 84, .25);
+      }
+
+      100% {
+        box-shadow: inset 0 0 0 0 rgba(255, 180, 84, 0);
+      }
+    }
+
+    .ro-head {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 8px;
+      font: 700 10px var(--disp);
+      letter-spacing: .3em;
+      color: var(--ink-dim);
+    }
+
+    .ro-head .mode {
+      margin-left: auto;
+      letter-spacing: .15em;
+      color: var(--amber);
+    }
+
+    .ro-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 3px 0;
+    }
+
+    .ro-k {
+      font: 600 9.5px var(--disp);
+      letter-spacing: .22em;
+      color: #6f9aa2;
+    }
+
+    .ro-v {
+      font: 600 17px var(--mono);
+      color: var(--amber);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 12px rgba(255, 180, 84, .35);
+      transition: color .3s;
+    }
+
+    #readout.idle .ro-v {
+      color: #3f6670;
+      text-shadow: none;
+    }
+
+    #readout.idle .ro-head .mode {
+      color: #4b7078;
+    }
+
+    /* ============ 左下：拾取记录 ============ */
+
+    .combined-header {
+      display: flex;
+      /* 启用 Flexbox 布局 使可以水平排列*/
+      align-items: center;
+      /* 垂直居中对齐 */
+      gap: 12px;
+      /* 设置两个元素之间的间距 */
+    }
+
+    .log-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line-soft);
+      font: 600 10px var(--disp);
+      letter-spacing: .24em;
+      color: var(--ink-dim);
+    }
+
+    #logCount {
+      font: 600 11px var(--mono);
+      color: var(--amber);
+    }
+
+    #clearLog {
+      margin-left: auto;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font: 600 10px var(--disp);
+      letter-spacing: .15em;
+      color: #6f9aa2;
+      transition: .15s;
+    }
+
+    #clearLog:hover {
+      color: var(--red);
+    }
+
+    #logList {
+      overflow-y: auto;
+      max-height: 152px;
+    }
+
+    .log-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-bottom: 1px dashed #16333c;
+      font: 500 11px var(--mono);
+      animation: slideIn .3s ease both;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    .log-idx {
+      color: var(--ink-faint);
+      flex: none;
+    }
+
+    .log-ll {
+      flex: 1;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .log-ll:hover {
+      color: var(--amber);
+      text-decoration: underline;
+    }
+
+    .log-item button {
+      background: none;
+      border: 1px solid transparent;
+      color: #6f9aa2;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 1px 5px;
+      transition: .15s;
+    }
+
+    .log-item button:hover {
+      color: var(--amber);
+      border-color: #2a5a68;
+    }
+
+    .log-empty {
+      padding: 12px;
+      text-align: center;
+      font-size: 11px;
+      color: #4b7078;
+    }
+
+    /* ============ 提示气泡 ============ */
+    #toast {
+      position: absolute;
+      left: 50%;
+      bottom: 34px;
+      z-index: 30;
+      transform: translate(-50%, 16px);
+      opacity: 0;
+      pointer-events: none;
+      background: var(--bg-raised);
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      font: 600 12px var(--disp);
+      letter-spacing: .1em;
+      padding: 9px 18px;
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+      transition: .3s;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <div id="vignette"></div>
+
+  <!-- ================= 左侧控制台 ================= -->
+  <aside id="panel">
+    <button id="panelTab" title="展开 / 收起面板">⌖</button>
+
+    <header class="p-head">
+      <svg class="reticle" viewBox="0 0 40 40">
+        <circle class="spin" cx="20" cy="20" r="15" fill="none" stroke="currentColor" stroke-width="1.5"
+          stroke-dasharray="4 5" />
+        <circle cx="20" cy="20" r="3" fill="currentColor" />
+        <path d="M20 2v8M20 30v8M2 20h8M30 20h8" stroke="currentColor" stroke-width="1.5" />
+      </svg>
+      <div>
+        <h1>COORD PICKER</h1>
+        <p>坐标拾取控制台 · 05</p>
+      </div>
+      <button id="collapseBtn" title="收起面板">«</button>
+    </header>
+
+    <div class="p-body">
+      <!-- 01 事件开关 -->
+      <div class="sec">
+        <div class="sec-t"><b>01</b> 事件开关</div>
+        <label class="sw">
+          <input type="checkbox" id="swClick" checked>
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">点击拾取 <small>快捷键 C</small></span>
+          <span class="led on" id="ledClick"></span>
+        </label>
+        <label class="sw">
+          <input type="checkbox" id="swMove" checked>
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">移动追踪 <small>快捷键 M</small></span>
+          <span class="led on" id="ledMove"></span>
+        </label>
+      </div>
+
+      <!-- 02 坐标类型 -->
+      <div class="sec">
+        <div class="sec-t"><b>02</b> 坐标类型</div>
+        <label class="ck"><input type="checkbox" id="ck_latlng" checked>
+          <span class="box"></span><span class="txt">经纬度<small>WGS84 · 度</small></span></label>
+        <label class="ck"><input type="checkbox" id="ck_screen">
+          <span class="box"></span><span class="txt">屏幕坐标<small>像素 · 原点左上角</small></span></label>
+        <label class="ck"><input type="checkbox" id="ck_ellipsoid">
+          <span class="box"></span><span class="txt">椭球面坐标<small>Cartesian3 · 不含地形</small></span></label>
+        <label class="ck"><input type="checkbox" id="ck_scene">
+          <span class="box"></span><span class="txt">场景坐标<small>含地形 / 模型 · 需深度检测</small></span></label>
+        <label class="ck"><input type="checkbox" id="ck_surface">
+          <span class="box"></span><span class="txt">地表坐标<small>含地形 · 不含模型</small></span></label>
+      </div>
+
+      <!-- 03 输出与标记 -->
+      <div class="sec">
+        <div class="sec-t"> <b>03</b>  输出与标记</div>
+        <label class="sw">
+          <input type="checkbox" id="swConsole" checked>
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">控制台输出 <small>console.log</small></span>
+        </label>
+        <label class="sw">
+          <input type="checkbox" id="swMarker" checked>
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">落点标记 <small>最多保留 12 个</small></span>
+        </label>
+      </div>
+
+      <!-- 04 场景调试 -->
+      <div class="sec">
+        <div class="sec-t"><b>04</b> 场景调试</div>
+        <label class="sw">
+          <input type="checkbox" id="swDepth">
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">地形深度检测 <small>pickPosition 必需</small></span>
+        </label>
+        <label class="sw">
+          <input type="checkbox" id="swFps">
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">帧率显示 <small>FPS</small></span>
+        </label>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="btns">
+        <button class="btn" id="copyLast" disabled>⧉ 复制经纬度</button>
+        <button class="btn warn" id="clearMarkers">✕ 清除标记</button>
+      </div>
+
+      <!-- 最近拾取 -->
+      <div class="last">
+        <h3>LAST PICK · 最近拾取 <button id="copyLast2" title="复制经纬度" disabled>⧉</button></h3>
+        <div id="lpRows">
+          <div class="lp-empty">尚未拾取 · 点击地球任意位置</div>
+        </div>
+      </div>
+
+  <div class="sec">
+    <!-- ✅ 修正：.combined-header 只负责对齐编号和标题 -->
+    <div class="combined-header">
+      <div class="sec-t"><b>05</b>拾取记录 PICK LOG</div>
+      <!-- ✅ 修正：.log-head 与 .sec-t 平级，作为模块的副标题 -->
+      <div class="log-head"><span id="logCount">0</span><button id="clearLog">清空</button></div>
+    </div>
+    <!-- 记录列表保持不变 -->
+    <div id="logList">
+      <div class="log-empty" id="logEmpty">暂无记录 · 点击地球开始拾取</div>
+    </div>
+  </div>
+
+    </div>
+
+
+
+    <footer class="p-foot">
+      <span class="led on" id="statusLed"></span><span id="statusTxt">PICK READY</span>
+      <span class="keys">快捷键 <b>C</b> / <b>M</b></span>
+    </footer>
+  </aside>
+
+  <!-- ================= 右下：实时读数 ================= -->
+  <div id="readout" class="idle">
+    <div class="ro-head"><span class="led" id="roLed"></span> LIVE READOUT <span class="mode"
+        id="roMode">TRACKING</span></div>
+    <div class="ro-row"><span class="ro-k">经度 LON</span><span class="ro-v" id="roLng">---.------</span></div>
+    <div class="ro-row"><span class="ro-k">纬度 LAT</span><span class="ro-v" id="roLat">---.------</span></div>
+    <div class="ro-row"><span class="ro-k">高程 ALT</span><span class="ro-v" id="roAlt">----.- m</span></div>
+  </div>
+
+
+  <div id="toast"></div>
+
+
+
+  <script type="text/javascript">
+    /* ============ 1. Viewer 初始化（保留原逻辑） ============ */
+    const viewer = new Cesium.Viewer('map', { 
+      imageryProvider: false, 
+      baseLayerPicker: false ,
+
+        // 去掉对话框警告
+      infoBox: false,
+      // 是否显示查询按钮
+      geocoder: false,
+      // 不显示home按钮
+      // homeButton: false,
+
+      // 控制查看器的显示模式（3D、2.5D、2D是否显示）
+      // sceneModePicker: false,
+      // 是否显示图层选择
+      baseLayerPicker: false,
+      // 是否显示帮助按钮
+      navigationHelpButton: false,
+      // 是否显示播放动画、计时
+      animation: false,
+      // 是否显示时间轴
+      timeline: false,
+      // 是否显示全屏按钮
+      fullscreenButton: true,
+
+    });
+          //隐藏 Cesium 的版权信息水印。
+          viewer.cesiumWidget.creditContainer.style.display = "none";
+
+    
+    
+    
+    
+   
+    const xyz = new Cesium.UrlTemplateImageryProvider({
+      "url": 'https://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=8c2b8afdfd321dbe7a98d7f78680ab52'
+    });
+    viewer.imageryLayers.addImageryProvider(xyz);
+
+    // 加载离线地形（原注释保留）
+    // viewer.terrainProvider = new Cesium.CesiumTerrainProvider({ url: 'http://localhost/dem_30m/' });
+    // 根据xy获得高度，贴地用（原注释保留）
+    // var cartographic = Cesium.Cartographic.fromDegrees(88.0157, 31.4643);
+    // var height21 = viewer.scene.globe.getHeight(new Cesium.Cartographic(cartographic.longitude, cartographic.latitude));
+
+    /* ============ 2. 全局状态 ============ */
+    const S = {
+      click: true, move: true,                       // 事件开关
+      toConsole: true, marker: true,                 // 输出与标记
+      screen: false, ellipsoid: false, latlng: true, // 坐标类型
+      scene: false, surface: false,
+      depth: false, fps: false                       // 场景调试
+    };
+    let lastResult = null;   // 最近一次点击结果
+    let pickCount = 0;       // 拾取计数
+    const markers = [];      // 落点标记实体
+
+    /* ============ 3. 工具函数 ============ */
+    const $ = id => document.getElementById(id);
+
+    function toast(msg) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(t._h);
+      t._h = setTimeout(() => t.classList.remove('show'), 1600);
+    }
+
+    function copyText(text) {
+      const done = () => toast('✓ 已复制：' + text);
+      const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败'); }
+        ta.remove();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fallback);
+      } else fallback();
+    }
+
+    function fmtC3(c) {
+      return 'X ' + c.x.toFixed(1) + '  Y ' + c.y.toFixed(1) + '  Z ' + c.z.toFixed(1);
+    }
+
+    /* 一次拾取四种坐标（含空值保护，点击太空不再报错） */
+    function pickAll(screenPos) {
+      const ellipsoid = viewer.scene.globe.ellipsoid;
+      const pe = viewer.scene.camera.pickEllipsoid(screenPos, ellipsoid);
+      if (!pe) return null;                       // 点在了地球外面
+      const carto = ellipsoid.cartesianToCartographic(pe);
+      const r = {
+        screen: screenPos,
+        ellipsoid: pe,
+        lng: Cesium.Math.toDegrees(carto.longitude),
+        lat: Cesium.Math.toDegrees(carto.latitude),
+        scene: viewer.scene.pickPosition(screenPos),
+        surface: null
+      };
+      const ray = viewer.camera.getPickRay(screenPos);
+      if (ray) r.surface = viewer.scene.globe.pick(ray, viewer.scene);
+      return r;
+    }
+
+    /* 鼠标位置 Cartesian3：优先用 latlng.js，缺失时回退原生 API */
+    function mouseCartesian(pos) {
+      try {
+        if (window.latlng && latlng.getCurrentMousePosition) {
+          const p = latlng.getCurrentMousePosition(viewer.scene, pos, null);
+          if (p) return p;
+        }
+      } catch (e) { }
+      let p = null;
+      if (S.depth) p = viewer.scene.pickPosition(pos);
+      if (!p) p = viewer.scene.camera.pickEllipsoid(pos, viewer.scene.globe.ellipsoid);
+      return p;
+    }
+
+    /* Cartesian3 → 经纬度（兼容 latlng.js 返回格式） */
+    function toLL(c) {
+      if (!c) return null;
+      try {
+        if (window.latlng && latlng.Cartesian3To) {
+          const o = latlng.Cartesian3To(c, viewer).latlng;
+          const lng = o && (o.lng ?? o.longitude);
+          const lat = o && (o.lat ?? o.latitude);
+          if (typeof lng === 'number' && typeof lat === 'number')
+            return { lng, lat, height: o.height ?? o.alt ?? 0 };
+        }
+      } catch (e) { }
+      const carto = viewer.scene.globe.ellipsoid.cartesianToCartographic(c);
+      if (!carto) return null;
+      return {
+        lng: Cesium.Math.toDegrees(carto.longitude),
+        lat: Cesium.Math.toDegrees(carto.latitude),
+        height: carto.height || 0
+      };
+    }
+
+    /* ============ 4. 核心事件（受开关控制） ============ */
+    const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+    /* —— 左键单击：拾取坐标 —— */
+    handler.setInputAction(function (movement) {
+      if (!S.click) return;                              // ← 开关关闭则跳过
+      const r = pickAll(movement.position);
+      if (!r) { toast('⚠ 点击位置不在地球表面'); return; }
+      lastResult = r;
+      pickCount++;
+      if (S.toConsole) printConsole(r);                  // 受"控制台输出"开关控制
+      renderLastPick();
+      if (S.marker) addMarker(r);
+      addLog(r);
+      pingReadout();
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    /* —— 鼠标移动：实时追踪（80ms 节流，不再刷屏） —— */
+    let lastMoveT = 0;
+    handler.setInputAction(function (movement) {
+      if (!S.move) return;                               // ← 开关关闭则跳过
+      const now = performance.now();
+      if (now - lastMoveT < 80) return;
+      lastMoveT = now;
+      const ll = toLL(mouseCartesian(movement.endPosition));
+      setReadout(ll);
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+    /* ============ 5. 输出与展示 ============ */
+    function printConsole(r) {
+      if (S.screen) console.log('屏幕坐标：', r.screen);
+      if (S.ellipsoid) console.log('WGS84 椭球体坐标：', r.ellipsoid);
+      if (S.latlng) console.log('经纬度坐标：', r.lng, r.lat);
+      if (S.scene) console.log('场景坐标：', r.scene);
+      if (S.surface) console.log('地表坐标：', r.surface);
+    }
+
+    function renderLastPick() {
+      const box = $('lpRows');
+      const btns = [$('copyLast'), $('copyLast2')];
+      if (!lastResult) {
+        box.innerHTML = '<div class="lp-empty">尚未拾取 · 点击地球任意位置</div>';
+        btns.forEach(b => b.disabled = true);
+        return;
+      }
+      btns.forEach(b => b.disabled = false);
+      const r = lastResult, rows = [];
+      if (S.screen) rows.push(['屏幕', 'x ' + r.screen.x + ' · y ' + r.screen.y]);
+      if (S.ellipsoid) rows.push(['椭球', fmtC3(r.ellipsoid)]);
+      if (S.latlng) rows.push(['经纬度', r.lng.toFixed(6) + ', ' + r.lat.toFixed(6)]);
+      if (S.scene) rows.push(['场景', r.scene ? fmtC3(r.scene) : (S.depth ? '未拾取到' : '需开启深度检测')]);
+      if (S.surface) rows.push(['地表', r.surface ? fmtC3(r.surface) : '未拾取到']);
+      box.innerHTML = rows.length
+        ? rows.map(([k, v]) => '<div class="lp-row"><span class="lp-k">' + k + '</span><span class="lp-v">' + v + '</span></div>').join('')
+        : '<div class="lp-empty">未在「坐标类型」中勾选任何项</div>';
+    }
+
+    function setReadout(ll) {
+      const ro = $('readout');
+      if (!ll) {
+        $('roLng').textContent = '---.------';
+        $('roLat').textContent = '---.------';
+        $('roAlt').textContent = '----.- m';
+        ro.classList.add('idle');
+        return;
+      }
+      ro.classList.remove('idle');
+      $('roLng').textContent = ll.lng.toFixed(6);
+      $('roLat').textContent = ll.lat.toFixed(6);
+      $('roAlt').textContent = (ll.height || 0).toFixed(1) + ' m';
+    }
+
+    function pingReadout() {
+      const ro = $('readout');
+      ro.classList.remove('ping');
+      void ro.offsetWidth;      // 强制重排，让动画可重复触发
+      ro.classList.add('ping');
+    }
+
+    /* ============ 6. 落点标记 & 拾取记录 ============ */
+    function addMarker(r) {
+      const e = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(r.lng, r.lat),
+        point: {
+          pixelSize: 9,
+          color: Cesium.Color.fromCssColorString('#ffb454'),
+          outlineColor: Cesium.Color.fromCssColorString('#0c1a1f'),
+          outlineWidth: 2
+        },
+        label: {
+          text: r.lng.toFixed(4) + ', ' + r.lat.toFixed(4),
+          font: '11px "IBM Plex Mono", monospace',
+          fillColor: Cesium.Color.fromCssColorString('#ffd28a'),
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString('#0c1a1f').withAlpha(0.85),
+          backgroundPadding: new Cesium.Cartesian2(6, 4),
+          pixelOffset: new Cesium.Cartesian2(0, -14)
+        }
+      });
+      markers.push(e);
+      if (markers.length > 12) viewer.entities.remove(markers.shift());  // 超出上限移除最旧
+    }
+
+    function setMarkersVisible(v) { markers.forEach(m => m.show = v); }
+
+    function addLog(r) {
+      const empty = $('logEmpty');
+      if (empty) empty.remove();
+      const llStr = r.lng.toFixed(6) + ', ' + r.lat.toFixed(6);
+      const item = document.createElement('div');
+      item.className = 'log-item';
+      item.innerHTML =
+        '<span class="log-idx">#' + String(pickCount).padStart(2, '0') + '</span>' +
+        '<span class="log-ll" title="点击飞行定位">' + llStr + '</span>' +
+        '<button title="复制">⧉</button>';
+      item.querySelector('.log-ll').onclick = () => {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(r.lng, r.lat, 400000),
+          duration: 1.4
+        });
+      };
+      item.querySelector('button').onclick = () => copyText(llStr);
+      $('logList').prepend(item);
+      while ($('logList').children.length > 30) $('logList').lastChild.remove();
+      $('logCount').textContent = pickCount;
+    }
+
+    /* ============ 7. 开关绑定 ============ */
+    function bindSw(id, key, fn) {
+      $(id).addEventListener('change', e => {
+        S[key] = e.target.checked;
+        if (fn) fn(e.target.checked);
+      });
+    }
+
+    bindSw('swClick', 'click', on => {
+      viewer.scene.canvas.style.cursor = on ? 'crosshair' : 'default';
+      $('ledClick').classList.toggle('on', on);
+      $('statusLed').classList.toggle('on', on);
+      $('statusTxt').textContent = on ? 'PICK READY' : 'STANDBY';
+    });
+    bindSw('swMove', 'move', on => {
+      $('ledMove').classList.toggle('on', on);
+      $('roLed').classList.toggle('on', on);
+      $('roMode').textContent = on ? 'TRACKING' : 'STANDBY';
+      if (!on) setReadout(null);
+    });
+    bindSw('swConsole', 'toConsole');
+    bindSw('swMarker', 'marker', on => setMarkersVisible(on));
+    bindSw('swDepth', 'depth', on => {
+      viewer.scene.globe.depthTestAgainstTerrain = on;   // pickPosition 精确的前提
+      toast(on ? '已开启地形深度检测' : '已关闭地形深度检测');
+    });
+    bindSw('swFps', 'fps', on => {
+      viewer.scene.debugShowFramesPerSecond = on;
+    });
+
+    /* 坐标类型复选框：改变后同步刷新"最近拾取"卡片 */
+    ['screen', 'ellipsoid', 'latlng', 'scene', 'surface'].forEach(k => {
+      $('ck_' + k).addEventListener('change', e => {
+        S[k] = e.target.checked;
+        renderLastPick();
+      });
+    });
+
+    /* ============ 8. 按钮 & 快捷键 & 面板折叠 ============ */
+    const copyLastLL = () => {
+      if (lastResult) copyText(lastResult.lng.toFixed(6) + ', ' + lastResult.lat.toFixed(6));
+    };
+    $('copyLast').onclick = copyLastLL;
+    $('copyLast2').onclick = copyLastLL;
+
+    $('clearMarkers').onclick = () => {
+      markers.forEach(m => viewer.entities.remove(m));
+      markers.length = 0;
+      toast('已清除全部标记');
+    };
+    $('clearLog').onclick = () => {
+      $('logList').innerHTML = '<div class="log-empty" id="logEmpty">暂无记录 · 点击地球开始拾取</div>';
+      $('logCount').textContent = '0';
+      toast('已清空拾取记录');
+    };
+
+    const panel = $('panel');
+    $('panelTab').onclick = () => panel.classList.toggle('collapsed');
+    $('collapseBtn').onclick = () => panel.classList.add('collapsed');
+
+    function flip(id) {
+      const el = $(id);
+      el.checked = !el.checked;
+      el.dispatchEvent(new Event('change'));
+    }
+    window.addEventListener('keydown', e => {
+      if (e.key === 'c' || e.key === 'C') flip('swClick');
+      if (e.key === 'm' || e.key === 'M') flip('swMove');
+    });
+
+    /* ============ 9. 初始化 ============ */
+    viewer.scene.canvas.style.cursor = 'crosshair';
+    renderLastPick();
+    setReadout(null);
+    console.log('✅ 坐标拾取控制台已就绪：点击地球拾取坐标，开关全部可用');
+  </script>
+</body>
+
+</html>
