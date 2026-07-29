@@ -69,7 +69,7 @@
       display: flex;
       flex-direction: column;
       color: var(--ink);
-      z-index: 10;
+      z-index: 9;
       background:
         radial-gradient(420px 260px at 110% -8%, rgba(255, 180, 84, .07), transparent 62%),
         repeating-radial-gradient(circle at 130% 12%, transparent 0 30px, rgba(96, 150, 158, .10) 30px 31px),
@@ -80,10 +80,10 @@
       filter: drop-shadow(0 14px 28px rgba(0, 0, 0, .5));
       transition: transform .4s cubic-bezier(.7, 0, .25, 1);
     }
-
-    #panel.collapsed {
+/* 这里先取消折叠的功能，等以后改善 */
+    /* #panel.collapsed {
       transform: translateX(calc(-100% - 28px));
-    }
+    } */
 
     /* 收起后露出的小标签 */
     #panelTab {
@@ -723,7 +723,7 @@
         <path d="M20 2v8M20 30v8M2 20h8M30 20h8" stroke="currentColor" stroke-width="1.5" />
       </svg>
       <div>
-        <h1>COORD PICKER</h1>
+        <h1>折叠功能待更新</h1>
         <p>坐标拾取控制台 · 05</p>
       </div>
       <button id="collapseBtn" title="收起面板">«</button>
