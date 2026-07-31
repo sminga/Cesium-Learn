@@ -1,0 +1,231 @@
+<!--********************************************************************
+* by jiawanlong
+*********************************************************************-->
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="./../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../libs/cesium/Cesium.js"></script>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+
+  <script type="text/javascript">
+
+    const viewer = new Cesium.Viewer('map', {
+      imageryProvider: false,
+      baseLayerPicker: false,
+    });
+
+    const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+      //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+      //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+      url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+      layer: "img",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+    viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+
+
+
+    // 开启帧率
+    viewer.scene.debugShowFramesPerSecond = true;
+
+
+
+    let start = Cesium.JulianDate.fromDate(new Date());
+    // 开始时间  cesium用的JulianDate:代表天文朱利安时间,用的是世界协调时,比北京时间晚8个小时, 加上东8时，就是当前的真正时间
+    start = Cesium.JulianDate.addHours(start, 8, new Cesium.JulianDate());
+
+    
+    // 结束时间 6分钟
+    /* 
+    Cesium.JulianDate.addSeconds(julianDate, seconds, result)
+| 参数          | 类型         | 说明 
+| `julianDate` | `JulianDate` | 作为计算基准的原始日期时间
+| `seconds`    | `Number`     | 需要增加或减少的秒数（传负数即为减去秒数） 
+| `result`     | `JulianDate` | 用于接收计算结果的现有实例（可选）
+*/ //类似的:
+  // Cesium.JulianDate.addMinutes(...)：加减分钟
+  // Cesium.JulianDate.addHours(...)：加减小时
+  // Cesium.JulianDate.addDays(...)：加减天数
+
+    const center = Cesium.JulianDate.addSeconds(start, 180, new Cesium.JulianDate());
+    const center2 = Cesium.JulianDate.addSeconds(start, 200, new Cesium.JulianDate());
+
+    const stop = Cesium.JulianDate.addSeconds(start, 360, new Cesium.JulianDate()); //设置结束时间
+
+    // 设置时钟范围
+    viewer.clock.startTime = start.clone(); //时间轴左边界，时钟不会早于
+    viewer.clock.stopTime = stop.clone();  //时间轴右边界，时钟不会晚于
+    viewer.clock.currentTime = start.clone();  //当前时间
+
+//---------------------------------------------------------------------------------------------------
+/*
+1. LOOP_STOP（循环模式）
+viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;   
+// 效果：实体每 10 秒闪烁一次（从起点重新出现并移动）
+
+2. UNBOUNDED（无限模式）
+viewer.clock.clockRange = Cesium.ClockRange.UNBOUNDED;
+// 效果：实体到达终点（第10秒）后，由于超出了 availability 的时间范围，
+// 实体会直接消失（隐藏）。但时钟不会停止，会继续往后走（11秒, 12秒...）
+
+3. CLAMPED（钳制模式//单次模式）
+viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+// 效果：实体从起点移动到终点，到达终点后完全静止，不再有任何动作
+
+
+viewer.clock.shouldAnimate = true; // 启动动画
+
+*/
+/*
+4. 控制循环次数,只循环特定次数然后停止,
+可以通过监听 onStop 事件来实现。
+例如，只循环 2 次然后停住：
+
+var count = 0;
+viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+
+var listener = function() {
+    count++;
+    if (count === 2) {
+        // 达到2次后，切换为 CLAMPED 模式，动画停止
+        viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+        // 移除监听器，避免后续报错
+        viewer.clock.onStop.removeEventListener(listener);
+    }
+};
+// 监听时钟到达 stopTime 的事件
+viewer.clock.onStop.addEventListener(listener);
+
+*/
+
+    // 循环结束时后续动作
+    viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+    // 时间速率控制速度，时间调快多少倍，比如原来用时360秒，调整10倍后，现在用时36秒
+    viewer.clock.multiplier = 10;
+
+    //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //给下方时间线设置边界
+    //让底部时间轴控件的可视范围精确对齐 [start, stop]，用户可以直观看到播放头在 360 秒区间内循环移动。
+    viewer.timeline.zoomTo(start, stop);
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  //<-------------位置采样属性—— 关键帧动画---------------------------------------------------------------------------------------------------------------------------------------------------->
+  
+    const position = new Cesium.SampledPositionProperty(); //创建一个"采样位置属性"——Cesium 的关键帧容器，Cesium 会在采样点之间自动插值出任意时刻的位置
+
+    //四个地点
+    const startPos = Cesium.Cartesian3.fromDegrees(-90, 20, 10000);
+    const centerPos = Cesium.Cartesian3.fromDegrees(-60, 40, 1000000);
+    const centerPos2 = Cesium.Cartesian3.fromDegrees(-60, 42, 1000000);
+    const endPos = Cesium.Cartesian3.fromDegrees(-120, 30, 3000000);
+
+
+  /*
+  position.addSample(时间, 地点);  //将时间和地点对应,路径是折线而非平滑曲线。
+  */
+/*
+想要弧线可加：
+position.setInterpolationOptions({
+    interpolationDegree: 5,    //取当前时间点附近的 6 个采样点（阶数 + 1）来进行曲线拟合计算,5个最好,但当采样点过少时,会出现抖动,所以要多加几个采样点,比如6个采样点,就要设置阶数为5
+    interpolationAlgorithm: Cesium.LagrangePolynomialApproximation  //指定插值算法为“拉格朗日多项式近似”,拟合出一条高阶多项式曲线
+});
+*/
+
+    position.addSample(start, startPos);
+    position.addSample(center, centerPos);
+    position.addSample(center2, centerPos2);
+    position.addSample(stop, endPos);
+
+
+ //<-------------添加实体---------------------------------------------------------------------------------------------------------------------------------------------------->   
+    //1.添加实体
+      const entity = viewer.entities.add({
+      //1.1 设置可用时间区间,通过 availability 属性设置实体的可用时间范围，超出范围后实体会消失,
+      availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({
+        start: start,
+        stop: stop
+      })]),
+
+      //1.2位置与朝向
+      position: position, // 计算实体位置属性
+      orientation: new Cesium.VelocityOrientationProperty(position),  // 基于位置移动自动计算方向.
+
+//1.3模型与标签
+      model: {
+        uri: './../../../libs/3D/missile/scene.gltf',
+        minimumPixelSize: 32 //相机拉远时模型最小保持 32 像素，防止 3000km 高度时看不见
+      },
+
+
+//1.4文字标签
+      label: {
+        text: '我是导弹',  // 标签文字
+        font: '10pt monospace',   //等宽字体 10 磅
+        outlineWidth: 2, //描边 2px
+        fillColor: Cesium.Color.BLUE,   //蓝色	文字填充色
+        showBackground: true,   //显示背景框
+        pixelOffset: new Cesium.Cartesian2(40, 20), //标签相对于模型的偏移量，向右 40 像素，向上 20 像素
+        backgroundColor: Cesium.Color.RED //红色	背景框填充色
+      },
+
+
+//1.5 发光轨迹
+      path: {
+        show: true,
+        resolution: 1, //采样步长 1 秒	每模拟秒取一个点连成线，越大越粗糙
+        material: new Cesium.PolylineGlowMaterialProperty({  //设置发光材质
+          glowPower: 0.1,   //发光强度，0-1，越大越亮,此时	光晕占线宽的 10%
+          color: Cesium.Color.PINK //粉色
+        }),
+        width: 5 //线宽 5 像素
+      }
+    });
+
+    // 开启运动
+    viewer.clock.shouldAnimate = true;
+
+    // 第三人称
+    // viewer.trackedEntity = entity; //会锁定相机跟随实体，此时鼠标拖拽旋转是被禁用的。
+
+    //跟随但可旋转
+    viewer.scene.screenSpaceCameraController.enableRotate = true;	
+
+    //完全自由视角
+    //viewer.trackedEntity = undefined;	
+
+    // 第一人称
+    // viewer.scene.preUpdate.addEventListener(traceHandler)
+//教程
+    // 第一人称视角动画跟踪:https://blog.csdn.net/dandan__666/article/details/115293860 
+    // 调整视角位置:https://blog.csdn.net/AllBluefm/article/details/137928976
+
+    function traceHandler() {
+      let center = entity.position.getValue(
+        viewer.clock.currentTime
+      );
+      let orientation = entity.orientation.getValue(
+        viewer.clock.currentTime
+      )
+      let transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+      transform = Cesium.Matrix4.fromRotationTranslation(Cesium.Matrix3.fromQuaternion(orientation), center);
+      viewer.camera.lookAtTransform(transform, new Cesium.Cartesian3(-20, 0, 30))
+    }
+
+  </script>
+</body>
+
+</html>
