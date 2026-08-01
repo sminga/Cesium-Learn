@@ -1,0 +1,154 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="./../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../libs/cesium/Cesium.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+    }
+
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+    }
+
+    .aaa {
+      width: 200px;
+      height: 100px;
+      pointer-events: none;
+      position: absolute;
+      color: aqua;
+      z-index: 99;
+    }
+
+    .arrow_box {
+      position: relative;
+      background: #0e00d5;
+      border: 4px solid #f50b02;
+      left: -50%;
+      top: -80%;
+    }
+
+    .arrow_box:after,
+    .arrow_box:before {
+      top: 100%;
+      left: 50%;
+      border: solid transparent;
+      content: " ";
+      height: 0;
+      width: 0;
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .arrow_box:after {
+      border-color: rgba(14, 0, 213, 0);
+      border-top-color: #0e00d5;
+      border-width: 30px;
+      margin-left: -30px;
+    }
+
+    .arrow_box:before {
+      border-color: rgba(245, 11, 2, 0);
+      border-top-color: #f50b02;
+      border-width: 36px;
+      margin-left: -36px;
+    }
+  </style>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+  <div class="aaa" id="test">
+    <div class='arrow_box'>
+      <h1 class='logo'>测试！！！！</h1>
+    </div>
+  </div>
+
+
+//<--------------------------------上方通过css和html来设置气泡框,通过ai更改.---------------------------------------------------------------------------------------------------------------------------------------------------- >
+//<--------------------------------下方通过cesium主要设置坐标对其.---------------------------------------------------------------------------------------------------------------------------------------------------- >
+  <script type="text/javascript">
+
+    const viewer = new Cesium.Viewer('map', {
+      imageryProvider: false,
+      baseLayerPicker: false,
+    });
+
+   const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+      //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+      //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+      url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+      layer: "img",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+    viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+
+    // 开启帧率
+    viewer.scene.debugShowFramesPerSecond = true;
+
+
+//<-------------添加实体---------------------------------------------------------------------------------------------------------------------------------------------------->
+    var hello = viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(-75.59777, 40.03883),
+      point: {   //声明该实体的几何类型为 点（Point）
+        pixelSize: 5,    //点的屏幕像素直径（不是世界坐标大小）。无论相机拉多远，这个点始终占 5×5 像素。
+        color: Cesium.Color.RED,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        verticalOrigin: Cesium.VerticalOrigin.TOP,  
+        /*点的垂直位置。默认是 CENTER，
+        CENTER表示点的中心在坐标位置，
+        BOTTOM表示点的底部在坐标位置，
+        TOP表示点的顶部在坐标位置。
+        */
+
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,  
+        /*点的高度参考。默认是 NONE，
+        NONE表示使用 position 中的绝对高度，忽略地形，
+        CLAMP_TO_GROUND 贴地，忽略 position 的高度值，始终在地形表面
+        RELATIVE_TO_GROUND表示在地形表面之上偏移 position.height 米
+        */
+
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        /* 设置遮挡情况  禁用深度测试的距离阈值
+        设为 Number.POSITIVE_INFINITY（无穷大）→ 永远不做深度测试 → 点永远可见，
+        设为 0 → 恢复正常遮挡。
+        设为 1000 → 相机距离 < 1000m 时不遮挡，> 1000m 时正常遮挡。
+        */
+      }
+    });
+
+
+    //<-------------添加html标签---------------------------------------------------------------------------------------------------------------------------------------------------->
+    var htmlOverlay = document.getElementById('test');
+    var scratch = new Cesium.Cartesian2();//用于存储屏幕坐标的临时变量
+
+    viewer.scene.preRender.addEventListener(function () {
+      var position = Cesium.Cartesian3.fromDegrees(-75.59777, 40.03883); //世界坐标（Cartesian3）
+
+      var canvasPosition = viewer.scene.cartesianToCanvasCoordinates(position, scratch); //右边接收结果,将三维世界坐标 → 二维屏幕像素坐标。
+
+      if (Cesium.defined(canvasPosition)) {
+        htmlOverlay.style.top = canvasPosition.y + 'px';
+        htmlOverlay.style.left = canvasPosition.x + 'px';
+      }
+    });
+  </script>
+</body>
+
+</html>

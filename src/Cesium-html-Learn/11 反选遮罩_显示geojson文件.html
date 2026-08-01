@@ -1,0 +1,415 @@
+<!-- /* =====================================================================
+* 区域高亮 + 反向遮罩 —— 可调项速查（注释版，无需 Markdown 渲染）
+* 用法：想改某项，复制该项「搜」后的字符串，在编辑器里 Ctrl+F 定位。
+* 注意：以下「搜」串对应【原始代码】字面；若已改用 CONFIG 模板，
+* 请改搜 CONFIG 字段名（见文件末尾的"CONFIG 对照"）。
+* =====================================================================
+*
+* 【目标城市 / 省份】
+* 搜：'./../../libs/GeoJSON/周口市.geojson'
+* 改：换文件名，例如 河南省.geojson
+* 注：须与 libs/GeoJSON/ 目录下实际文件名完全一致
+*
+* 【高亮填充色 & 透明度】（省内那块高亮的颜色）
+* 搜：fill: Cesium.Color.BLUE.withAlpha(0.6)
+* 改：a. 颜色——把 BLUE 换成 RED / GREEN，或 Cesium.Color.fromCssColorString('#ff8800')
+* b. 透明——改 withAlpha(0.6) 的 0.6（0 全透 → 1 全实；想多透卫星图就调小）
+*
+* 【边界线颜色】（陷阱①：贴地下 stroke 无效，真正画线的是这里）
+* 搜：material: Cesium.Color.fromCssColorString('#6dcdeb') （位于"步骤 A+"的 polyline 内）
+* 改：改引号里的 hex 值
+* 注：别去改步骤 A 的 stroke——clampToGround:true 时它被吞，是摆设
+*
+* 【边界线粗细】
+* 搜：width: 2 （位于"步骤 A+"的 polyline 内）
+* 改：改数字，单位像素；贴地折线的 width 有效
+*
+* 【遮罩颜色 & 透明度】（省外变暗的那层，别和上面的 fill 搞混）
+* 搜：material: Cesium.Color.BLACK.withAlpha(0.6) （位于遮罩 entities.add 内）
+* 改：a. 颜色——把 BLACK 换别的色
+* b. 透明——改 withAlpha(0.6) 的 0.6（越大省外越黑）
+*
+* 【遮罩外框范围】（陷阱②：手填经纬度换城市易"框不住"）
+* 搜：[100, 20, 100, 45, 125, 45, 125, 20]
+* 改：建议改用 turf.bbox(geojsonData) 自动算包围盒再外扩，见重构模板
+* 注：外框若包不住目标，遮罩的"洞"会跑到框外 → 遮罩失效/错位
+*
+* 【内部分界线 显示 / 隐藏】（地市或区县之间的线）
+* 搜：const eachRing （整段"步骤 A+"，从 const eachRing 起到对应 forEach 结束）
+* 改：想隐藏→注释掉这整段；想显示→放开
+* 注：若用 CONFIG 模板，改 showInnerBorder: true/false 即可，无需注释
+*
+* 【相机飞行时长】
+* 搜：duration: 3
+* 改：改秒数；填 0 = 瞬间到位，不飞
+*
+* 【遮罩实体 id】
+* 搜：id: 'maskArea'
+* 改：同一画面画多个区域时，必须改成互不相同的值
+* 注：id 重复会让 entities.add 冲突；模板里已用 Date.now() 自动防重
+*
+* ===================================================================== */ -->
+
+
+<!-- ------------------------------------------------------ -->
+<!-- 
+| 风格                | `fillColor`                                  | `lineColor` | `maskColor`                                   | 适合场景 |
+| 科技青蓝（你现在的） | `Cesium.Color.BLUE`                          | `#6dcdeb`    | `Cesium.Color.BLACK`                          | 大屏 / 数据看板 |
+| 警示红橙            | `Cesium.Color.fromCssColorString('#e8462b')` | `#ffd166`    | `Cesium.Color.fromCssColorString('#1a0d0d')` | 疫情 /灾情 / 风险区 |
+| 生态绿              | `Cesium.Color.fromCssColorString('#2fa36b')` | `#b6f2c8`   | `Cesium.Color.fromCssColorString('#06140d')` | 林地 /农业 / 保护区 |
+| 夜间紫              | `Cesium.Color.fromCssColorString('#6a4cff')` | `#c9b8ff`   | `Cesium.Color.fromCssColorString('#0a0716')` | 暗色底图 /夜间模式 |
+| 政务金              | `Cesium.Color.fromCssColorString('#c8962a')` | `#ffe6a3`   | `Cesium.Color.fromCssColorString('#14100a')` | 行政汇报 /规划图 | 
+-->
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+<link rel="stylesheet" href="./../../libs/cesium/Widgets/widgets.css">
+<script type="text/javascript" src="./../../libs/cesium/Cesium.js"></script>
+  
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script> 
+  <!-- axios是一个基于Promise的HTTP库，可以用于浏览器和node.js中发送HTTP请求。它提供了简单的API来处理异步请求，并支持拦截请求和响应、取消请求、自动转换JSON数据等功能。常用于与后端进行数据交互，获取或发送数据。 -->
+  <script src="./../../libs/JS/turf.min.js"></script>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+
+  <script type="text/javascript">
+
+    const viewer = new Cesium.Viewer('map', {
+      imageryProvider: false,
+      baseLayerPicker: false,
+    });
+
+  const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+    //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+    //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+    url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+    layer: "img",
+    style: "default",
+    tileMatrixSetID: "w",
+    format: "tiles",
+    maximumLevel: 18
+  });
+  viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+    // 开启帧率
+    viewer.scene.debugShowFramesPerSecond = true;
+    const maskpointArray = []
+
+
+
+//<----------------方案一:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------->
+//底层渲染：使用 GeoJsonDataSource 优雅地加载并高亮河南省的 18 个区域。
+//遮罩生成：利用引入的 Turf.min.js，通过 turf.union() 将这 18 个区域合并为一个完整的多边形，然后再用 Cesium.Entity 绘制反向遮罩。
+/* GeoJsonDataSource 使用说明
+// 
+const dataUrl = './libs/GeoJSON/河南省.geojson';
+
+// 
+const styleOptions = {
+  stroke: Cesium.Color.fromCssColorString('#6dcdeb'), // 线 & 面边界颜色：青蓝（hex 转 Color）
+  strokeWidth: 2,                                     // 线 & 面边界像素宽：2px（贴地时可能失效，见 §3.2）
+  fill: Cesium.Color.BLUE.withAlpha(0.6),             // 面填充色：半透明蓝（alpha 0~1，0 全透 1 全实）
+  markerSymbol: undefined,                            // 点图标：Maki 名或图片 URL；undefined=用内置 pin
+  markerSize: 48,                                     // 点 pin/图标尺寸：48 像素
+  markerColor: Cesium.Color.ROYALBLUE,                // 点 pin 填充色（自定义 markerSymbol 时也会着色）
+  markerOutlineColor: Cesium.Color.BLACK,             // 点 pin 描边色
+  markerOutlineWidth: 2,                              // 点 pin 描边宽：2px
+  clampToGround: true                                 // 是否贴地：true=贴地形/影像；false=落椭球面或按海拔
+};
+
+
+
+// data + options 一起传入
+Cesium.GeoJsonDataSource.load(dataUrl, styleOptions)  
+
+
+  .then((dataSource) => {                             // 解析完成后回调，dataSource 即造好的数据源
+    viewer.dataSources.add(dataSource);               // 关键：add 之后才上屏（load 只造不挂）
+    viewer.flyTo(dataSource, { duration: 2 });        // 相机飞到该数据源范围，动画 2 秒
+    console.log('要素数:', dataSource.entities.values.length); // 打印实体个数，便于核对
+  })
+
+  .catch((err) => {                                   // 整条链任意环节抛错都进这里
+    console.error('GeoJSON 加载失败:', err);          // 404 / 格式坏 / 坐标异常 都会落到这
+  });
+
+*/
+//libs\GeoJSON\anzhouBorder.json 是geojson内部格式参考文件,网上下的不知道为啥都放在同一行,不方便观看
+  axios.get('./../../libs/GeoJSON/周口市.geojson')
+      .then((response) => {
+        const geojsonData = response.data;
+
+        // ===== 步骤 A：高亮填充 + 边界线（stroke 自动画好外轮廓和地市线）=====
+        Cesium.GeoJsonDataSource.load(geojsonData, {
+          stroke: Cesium.Color.fromCssColorString('#6dcdeb'),
+          fill: Cesium.Color.BLUE.withAlpha(0.6),
+          strokeWidth: 2,
+          clampToGround: true
+
+
+
+        }).then((dataSource) => {
+          viewer.dataSources.add(dataSource);
+          viewer.flyTo(dataSource, { duration: 3 }); // // 使用 flyTo 方法让相机平滑飞行到边界线实体，持续时间为 3 秒
+        });
+
+        // ===== 步骤 B：合并 → 反向遮罩 =====
+        const combined = turf.combine(geojsonData);
+        const mergedPolygon = combined.features[0];
+        if (!mergedPolygon || !mergedPolygon.geometry) {
+          console.error('合并失败');
+          return;
+        }
+
+        const geom = mergedPolygon.geometry;
+        const outerRings = [];
+        if (geom.type === 'MultiPolygon') {
+          geom.coordinates.forEach((polygon) => outerRings.push(polygon[0])); // 只取外环
+        } else if (geom.type === 'Polygon') {
+          outerRings.push(geom.coordinates[0]);
+        }
+
+        // 每个外环单独转成一个 hole（绝不能合并成一个数组！）
+        const holes = outerRings.map((ring) => {
+          const flat = [];
+          ring.forEach((pt) => flat.push(pt[0], pt[1]));
+          return { positions: Cesium.Cartesian3.fromDegreesArray(flat) };
+        });
+//<---------------显示内部的市区等小块,注释掉则不显示--------------------------------------------------------------------------------------------------------------------->
+        // ===== 步骤 A+：补回"贴地边界线"（地市分界线 + 省外轮廓）=====
+
+        // 小工具：把一个 geometry 的所有坐标环逐个回调，兼容 Polygon 与 MultiPolygon
+        const eachRing = (geom, cb) => {
+          if (geom.type === 'Polygon') {
+            geom.coordinates.forEach(cb);                          // Polygon 结构：coordinates = [ 环, 环... ]
+          } else if (geom.type === 'MultiPolygon') {
+            geom.coordinates.forEach((poly) => poly.forEach(cb));  // MultiPolygon 结构：coordinates = [ [环..], [环..] ]
+          }
+        };
+
+        // 遍历 18 个地市 feature，把每个地市的每个环画成一条【独立】的贴地折线
+        geojsonData.features.forEach((feature) => {
+          eachRing(feature.geometry, (ring) => {                   // ring = [ [lng,lat], [lng,lat], ... ] 一个闭合环
+            const flat = [];                                       // 准备一维经纬度数组
+            ring.forEach((pt) => flat.push(pt[0], pt[1]));         // 展平：[lng1,lat1,lng2,lat2,...]，供 fromDegreesArray 使用
+            viewer.entities.add({                                  // 每个环 = 一个独立 entity（= 一条独立线 → 不会串出斜线）
+              polyline: {
+                positions: Cesium.Cartesian3.fromDegreesArray(flat),          // 这个环的坐标，转成笛卡尔点串
+                width: 2,                                                     // 线宽 2 像素（贴地折线的 width 是有效的，不像贴地面的 strokeWidth 会被吞）
+                material: Cesium.Color.fromCssColorString('#6dcdeb'),         // 青色描边，和你想要的外轮廓同色
+                clampToGround: true                                           // 贴地，跟蓝块、黑遮罩一起趴在地表，高度一致不打架
+              }
+            });
+          });
+        });
+
+
+
+
+
+//<------------------------------------------------------------------------------------------------------------------------------------>
+
+        //添加遮罩
+        viewer.entities.add({
+          id: 'maskArea',
+          polygon: {
+            hierarchy: {
+              positions: Cesium.Cartesian3.fromDegreesArray([100, 20, 100, 45, 125, 45, 125, 20]),
+              holes: holes
+            },
+            material: Cesium.Color.BLACK.withAlpha(0.6),
+            classificationType: Cesium.ClassificationType.BOTH
+          }
+        });
+
+      
+      })
+      .catch((error) => {
+        console.error('Axios 请求失败:', error);
+      });
+
+
+//<---------------方案二: 只能处理包含一组坐标的数据--------------------------------------------------------------------------------------------------------------------------------------------->
+// // 一, 数据请求与坐标转换
+//    // 不提供示例数据
+
+//     axios.get('./../../libs/GeoJSON/anzhouBorder.json') // 1. 使用 axios 异步请求读取本地的区域 GeoJSON 文件
+
+//       .then((response) => { // 2. 请求成功后，进入回调函数，response.data 为解析后的 JSON 对象
+
+        
+//         // 3. 初始化一个空数组，用于存放转换后的扁平化经纬度数据
+//         // Cesium 的 fromDegreesArray 需要一维数组格式，如 [lng1, lat1, lng2, lat2, ...]
+//         for (let i = 0; i < response.data.features[0].geometry.coordinates[0].length; i++) {
+
+//           // 4. 将 GeoJSON 中嵌套的二维坐标数组拆解，依次推入经度和纬度
+//           maskpointArray.push(response.data.features[0].geometry.coordinates[0][i][0]) // 经度
+//           maskpointArray.push(response.data.features[0].geometry.coordinates[0][i][1]) // 纬度
+//         }
+
+//         // 5. 将扁平化的经纬度数组转换为 Cesium 的三维笛卡尔坐标数组 (Cartesian3)
+//         var maskspoint = Cesium.Cartesian3.fromDegreesArray(maskpointArray)
+
+
+
+// //  二,  创建反向遮罩多边形 (Polygon)
+//             // 6. 实例化一个 Cesium 实体 (Entity)，用于绘制遮罩层
+//         const area = new Cesium.Entity({
+
+//           id: 1, // 7. 为实体分配唯一标识符
+//           polygon: { // 8. 声明该实体的几何类型为多边形
+//             hierarchy: { // 9. 【核心】定义多边形的层级结构，包含外边界和内部孔洞
+              
+//               positions: Cesium.Cartesian3.fromDegreesArray([100, 0, 100, 89, 150, 89, 150, 0]),
+//               /*在 Cesium 中，Cesium.Cartesian3.fromDegreesArray() 接收的是一个扁平化的一维数组，
+//               其排列规则是严格交替的：[经度1, 纬度1, 经度2, 纬度2, 经度3, 纬度3, ...]。
+
+//               */
+
+//               holes: [{ // 11. 定义内部孔洞数组，数组内可以有多个孔洞
+//                 positions: maskspoint // 12. 将之前转换好的行政区域坐标作为孔洞，实现“挖空”效果
+//               }]
+//             },
+//             material: Cesium.Color.BLUE.withAlpha(0.6) // 13. 设置多边形的填充材质为透明度 0.6 的蓝色
+//           }
+//         })
+
+// //  三,创建边界轮廓线 (Polyline)
+//         // 14. 实例化第二个实体，用于绘制行政区域的边界线
+//         const line = new Cesium.Entity({
+//           id: 2, // 15. 实体唯一标识符
+//           polyline: { // 16. 声明几何类型为折线
+//             positions: maskspoint, // 17. 折线的顶点坐标（复用之前转换好的笛卡尔坐标）
+//             width: 2, // 18. 设置线条宽度为 2 像素
+//             material: Cesium.Color.fromCssColorString('#6dcdeb') // 19. 使用 CSS 颜色字符串设置线条颜色（浅蓝色）
+//           }
+//         })
+
+// // 四, 添加实体到场景并飞行到区域
+//         viewer.entities.add(area)
+//         viewer.entities.add(line)
+//         viewer.flyTo(line, { duration: 3 }) // 20. 使用 flyTo 方法让相机平滑飞行到边界线实体，持续时间为 3 秒
+//       }
+//     ).catch((response) => {
+//         console.log(response)
+//       })
+
+
+
+ 
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // -------------------------方法3----------------------
+    // axios.get('./anzhouBorder.json')//读取区域json
+    //     .then((response1) => {
+    //        let  response = response1.data;
+    //         //设置地表透明
+    //         let globe = viewer.scene.globe;
+    //         let scene = viewer.scene;
+    //         globe.depthTestAgainstTerrain = false;
+    //         viewer.scene.skyAtmosphere.show = false; //关闭大气层阴影
+    //         // screenSpaceCameraController获取用于摄像机输入处理的控制器;
+    //         // enableCollisionDetectio启用或禁用摄影机与地形的碰撞检测,
+    //         //   为true不会进入地下;
+    //         // scene.screenSpaceCameraController.enableCollisionDetection = false;
+    //         globe.translucency.frontFaceAlphaByDistance = new Cesium.NearFarScalar(
+    //             400.0,
+    //             0.0,
+    //             800.0,
+    //             1.0
+    //         );
+    //         globe.translucency.enabled = true;
+    //         globe.translucency.frontFaceAlphaByDistance.nearValue = Cesium.Math.clamp(
+    //             0.3,
+    //             0.0,
+    //             0.1
+    //         );
+    //         globe.translucency.frontFaceAlphaByDistance.farValue = 1.0;
+    //         viewer.scene.screenSpaceCameraController.minimumZoomDistance = 10000;
+    //         viewer.scene.screenSpaceCameraController.maximumZoomDistance = 50000;
+    //         let bounds = [];
+    //         // viewer.scene.globe.depthTestAgainstTerrain = true;
+    //         // let response = pinggubianjieJson;
+    //         const maskpointArray = [];
+    //         for (
+    //             let i = 0;
+    //             i < response.features[0].geometry.coordinates[0].length;
+    //             i++
+    //         ) {
+    //             bounds.push([
+    //                 response.features[0].geometry.coordinates[0][i][0],
+    //                 response.features[0].geometry.coordinates[0][i][1],
+    //             ]);
+    //             maskpointArray.push(response.features[0].geometry.coordinates[0][i][0]);
+    //             maskpointArray.push(response.features[0].geometry.coordinates[0][i][1]);
+    //         }
+    //         boundspolygon = turf.polygon([bounds]);
+    //         var maskspoint = Cesium.Cartesian3.fromDegreesArray(maskpointArray);
+    //         const entity1 = new Cesium.Entity({
+    //             id: 1,
+    //             polygon: {
+    //                 hierarchy: {
+    //                     // 绘制的区域太大容易卡顿
+    //                     positions: Cesium.Cartesian3.fromDegreesArray([
+    //                         100, 0, 100, 89, 150, 89, 150, 0,
+    //                         // 113.37890625, 37.50972584293751, 121.28906250000001,
+    //                         // 37.50972584293751, 121.28906250000001, 42.35854391749705,
+    //                         // 113.37890625, 42.35854391749705, 113.37890625, 37.50972584293751,
+    //                     ]),
+    //                     // holes是图形内需要挖空的区域
+    //                     holes: [
+    //                         {
+    //                             positions: maskspoint,
+    //                         },
+    //                     ],
+    //                 },
+    //                 material: Cesium.Color.WHITE.withAlpha(0.5),
+    //                 // material: Cesium.Color.WHITE.withAlpha(1),
+    //             },
+    //         });
+
+    //         const entity3 = new Cesium.Entity({
+    //             name: "动态立体墙",
+    //             wall: {
+    //                 positions: maskspoint,
+    //                 maximumHeights: maskspoint.map((res) => {
+    //                     return 600;
+    //                 }),
+    //                 minimumHeights: maskspoint.map((res) => {
+    //                     return -600;
+    //                 }),
+    //                 material: Cesium.Color.fromCssColorString("#6dcdeb"),
+    //             },
+    //         });
+    //         viewer.entities.add(entity1);
+    //         viewer.entities.add(entity3);
+    //         viewer.flyTo(entity3, {
+    //             duration: 3,
+    //         });
+    //     })
+  </script>
+</body>
+
+</html>
