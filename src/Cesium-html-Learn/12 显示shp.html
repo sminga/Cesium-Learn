@@ -1,0 +1,187 @@
+<!--********************************************************************
+    * by jiawanlong
+    *********************************************************************-->
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="./../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../libs/cesium/Cesium.js"></script>
+
+  <script src="./../../libs/JS/CesiumVectorTile.js/CesiumVectorTile.min.js"></script>
+  <script src="./../../libs/JS/jquery-1.8.3.min.js"></script>
+
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+
+  <script type="text/javascript">
+
+    const viewer = new Cesium.Viewer('map', {
+      // 去掉对话框警告
+      infoBox: false,
+      // 是否显示查询按钮
+      geocoder: false,
+      // 不显示home按钮
+      homeButton: false,
+      // 控制查看器的显示模式（3D、2.5D、2D是否显示）
+      sceneModePicker: false,
+      // 是否显示图层选择
+      baseLayerPicker: false,
+      // 是否显示帮助按钮
+      navigationHelpButton: false,
+      // 是否显示播放动画、计时
+      animation: false,
+      // 是否显示时间轴
+      timeline: false,
+      // 是否显示全屏按钮
+      fullscreenButton: false,
+
+    });
+    //隐藏 Cesium 的版权信息水印。
+    viewer.cesiumWidget.creditContainer.style.display = "none";
+
+    const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+      //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+      //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+      url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+      layer: "img",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+    viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+    // 开启帧率
+    viewer.scene.debugShowFramesPerSecond = true;
+
+  // ============================================================
+  // 【补丁 A】修隐患6：补回被新版 Cesium 移除的老 API
+  //   ⚠️ 必须放在 new VectorTileImageryProvider 之前！
+  // ============================================================
+  if (typeof Cesium.defineProperties !== "function") {
+    Cesium.defineProperties = Object.defineProperties;   // 等价替换
+  }
+  if (typeof Cesium.when === "undefined") {
+    Cesium.when = function (v) { return Promise.resolve(v); };
+    Cesium.when.all = function (arr) { return Promise.all(arr); };
+    Cesium.when.defer = function () {
+      var resolve, reject;
+      var promise = new Promise(function (res, rej) { resolve = res; reject = rej; });
+      return { promise: promise, resolve: resolve, reject: reject };
+    };
+  }
+
+  //<-------------------------------------------------------------------------------------------------------------------------------------------------------------------------->
+
+  var config = {
+    //.cpg 是字符编码声明文件，一般不用加载
+    url: {
+      shp: "./../../libs/Shapefile/中华人民共和国/中华人民共和国.shp",
+      shx: "./../../libs/Shapefile/中华人民共和国/中华人民共和国.shx",  
+      dbf: "./../../libs/Shapefile/中华人民共和国/中华人民共和国.dbf",
+      prj: "./../../libs/Shapefile/中华人民共和国/中华人民共和国.prj"
+    },
+    name: {
+      shp: "china.shp",
+      shx: "china.shx",  
+      dbf: "china.dbf",
+      prj: "china.prj"
+    },
+    style: {
+      outlineColor: "rgb(1,255,0)",
+      lineWidth: 5,
+      fill: true,
+      fillColor: "rgba(0,255,0,0.2)"   // ← 建议加上，否则填充可能透明
+    },
+    isFlyTo: true,
+    minimumLevel: 1, //缩放级别 < 1 时不请求该图层的瓦片（太粗没必要）。
+    maximumLevel: 20 //缩放级别 > 20 时不再请求更细的瓦片，而是把 20 级的瓦片放大复用（避免无意义的高级别请求，也防止插件去算不存在的层级）。
+  };
+
+  // ✅ 用原生 Promise.all 替代已移除的 Cesium.when.all
+  Promise.all([
+    Cesium.Resource.fetchBlob(config.url.shp),
+    Cesium.Resource.fetchBlob(config.url.shx),
+    Cesium.Resource.fetchBlob(config.url.dbf),
+    Cesium.Resource.fetchBlob(config.url.prj)
+  ]).then(function (blobs) {
+
+    // ✅ 用 new File() 赋予文件名（Blob.name 是只读的，不能直接赋值）
+    var files = [
+      new File([blobs[0]], config.name.shp),
+      new File([blobs[1]], config.name.shx),
+      new File([blobs[2]], config.name.dbf),
+      new File([blobs[3]], config.name.prj)
+    ];
+
+    var shpProvider = new Cesium.VectorTileImageryProvider({  //不是 Cesium 官方类，而是第三方插件 CesiumVectorTile
+      source: files,
+      credit: "credit",
+      defaultStyle: config.style,
+      minimumLevel: config.minimumLevel,
+      maximumLevel: config.maximumLevel
+    });
+
+
+
+
+     function addLayer() {
+      try {
+        if (!shpProvider.rectangle) {                       // 万一此刻仍为空
+          Object.defineProperty(shpProvider, "rectangle", { // 补一个 getter 兜底
+            get: function () {
+              return (this.tilingScheme && this.tilingScheme.rectangle) || Cesium.Rectangle.MAX_VALUE;
+            },
+            configurable: true,
+            enumerable: true
+          });
+          console.warn("⚠️ rectangle 为空，已用兜底范围（flyTo 可能落到全球视角）");
+        }
+      } catch (e) {
+        console.warn("补 rectangle 失败：", e);             // 兜底本身不能成为新崩溃点
+      }
+
+      var layer = viewer.imageryLayers.addImageryProvider(shpProvider);  // 此刻 rectangle 必有值，不崩
+      if (config.isFlyTo) viewer.flyTo(layer);
+      console.log("✅ 图层已添加，ready =", shpProvider.ready);
+    }
+
+  
+    // 等 ready 之后再 add
+  
+    function tryAddWhenReady() {
+      // 分支1：插件给了 thenable 的 readyPromise（旧 Cesium 规范）
+      if (shpProvider.readyPromise && typeof shpProvider.readyPromise.then === "function") {
+        shpProvider.readyPromise.then(addLayer, function (e) {
+          console.warn("readyPromise reject，强制添加：", e);
+          addLayer();
+        });
+        return;
+      }
+      // 分支2：没有 readyPromise，就轮询 ready 布尔 + 超时强加
+      var n = 0;
+      var timer = setInterval(function () {
+        n++;
+        if (shpProvider.ready) { clearInterval(timer); addLayer(); }
+        else if (n > 50) {       // 50 × 100ms = 5 秒超时
+          clearInterval(timer);
+          console.warn("⚠️ 5 秒未 ready，强制添加（依赖 rectangle 兜底）");
+          addLayer();
+        }
+      }, 100);
+    }
+
+    tryAddWhenReady();   // ← 用这一行【替代】你原来的「直接 add + flyTo」
+
+
+  }).catch(function (err) {
+    console.error("加载 Shapefile 失败：", err);
+  });
+
+  </script>
+</body>
+
+</html>
