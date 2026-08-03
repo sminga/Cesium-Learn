@@ -1,4 +1,288 @@
 
+/* ==========================================================================
+ * 📦 MVT 矢量瓦片渲染插件 (Cesium + OpenLayers)
+ * ==========================================================================
+ *
+ * 【概述】
+ *   本插件将 MVT (.pbf) 矢量瓦片数据解析渲染为 Canvas 图像，
+ *   并封装为 Cesium ImageryProvider 接口，可叠加到三维地球场景中。
+ *   样式系统基于 OpenLayers Style 实现，支持自定义样式函数。
+ *
+ * 【依赖】
+ *   - Cesium (ImageryProvider 接口、Resource、TileReplacementQueue 等)
+ *   - OpenLayers (ol.format.MVT、ol.render.canvas.ReplayGroup、
+ *     ol.style.*、ol.renderer.vector、ol.tilegrid)
+ *   - 全局变量 window.ol 必须可用
+ *
+ * 【对外命名空间】 window.mvt
+ *   ├── mvt.create(options)         → 创建 MVT ImageryProvider
+ *   └── mvt.StreetsV6Style()       → 获取 Mapbox Streets V6 样式函数
+ *
+ * ==========================================================================
+ * 📑 目录
+ * ==========================================================================
+ *
+ * 1. createMVTWithStyle(options)          — 主入口：创建 MVT Provider
+ * │
+ * ├─ 1.1 MVTProvider 构造函数
+ * │   ├── 参数说明 (options)
+ * │   │   ├── tilingScheme     — 瓦片分割方案
+ * │   │   ├── tileWidth        — 瓦片宽度
+ * │   │   ├── tileHeight       — 瓦片高度
+ * │   │   ├── style            — 样式函数 (必须)
+ * │   │   ├── key              — 服务访问密钥
+ * │   │   ├── url              — MVT 瓦片服务地址模板
+ * │   │   └── ellipsoid        — 椭球体
+ * │   ├── 内部属性
+ * │   │   ├── _mvtParser       — OpenLayers MVT 解析器
+ * │   │   ├── _styleFun        — 用户传入的样式函数
+ * │   │   ├── _tileQueue       — 瓦片缓存队列 (TileReplacementQueue)
+ * │   │   ├── _cacheSize       — 缓存上限 (默认 1000)
+ * │   │   ├── _resolutions     — 各层级分辨率数组
+ * │   │   ├── _pixelRatio      — 像素比 (固定 1)
+ * │   │   ├── _transform       — Canvas 变换矩阵
+ * │   │   └── _replays         — 渲染回放类型列表
+ * │   └── 初始化逻辑
+ * │
+ * ├─ 1.2 MVTProvider 属性 (Object.defineProperties)
+ * │   ├── proxy
+ * │   ├── tileWidth / tileHeight
+ * │   ├── maximumLevel / minimumLevel
+ * │   ├── tilingScheme
+ * │   ├── rectangle
+ * │   ├── tileDiscardPolicy
+ * │   ├── errorEvent
+ * │   ├── ready / readyPromise
+ * │   ├── credit
+ * │   └── hasAlphaChannel
+ * │
+ * ├─ 1.3 MVTProvider.prototype.getTileCredits(x, y, level)
+ * │
+ * ├─ 1.4 MVTProvider.prototype.requestImage(x, y, level, request)
+ * │   ├── 缓存命中逻辑
+ * │   ├── URL 模板替换
+ * │   ├── 请求 ArrayBuffer
+ * │   ├── 解析 MVT Features
+ * │   ├── 应用样式函数渲染到 Canvas
+ * │   ├── 缓存淘汰 (trimTiles)
+ * │   └── 返回 Canvas 元素
+ * │
+ * ├─ 1.5 MVTProvider.prototype.pickFeatures(x, y, level, lon, lat)
+ * │
+ * ├─ 1.6 内部辅助函数
+ * │   ├── findTileInQueue(x, y, level, tileQueue)  — 缓存查找
+ * │   ├── remove(tileReplacementQueue, item)       — 缓存移除
+ * │   └── trimTiles(tileQueue, maximumTiles)       — 缓存裁剪
+ * │
+ * 2. createMapboxStreetsV6Style()         — Mapbox Streets V6 样式工厂
+ * │
+ * ├─ 2.1 基础样式对象定义
+ * │   ├── fill / stroke / polygon / strokedPolygon / line / text
+ * │   └── iconCache / getIcon(iconName)
+ * │
+ * ├─ 2.2 样式分发函数 (feature, resolution) → styles[]
+ * │   ├── landuse (park/cemetery/hospital/school/wood)
+ * │   ├── waterway (river/stream/canal/其他)
+ * │   ├── water
+ * │   ├── aeroway (Polygon/LineString)
+ * │   ├── building
+ * │   ├── tunnel (motorway_link/service/street/main/motorway/path/major_rail)
+ * │   ├── road (motorway_link/street/main/motorway/path/major_rail)
+ * │   ├── bridge (motorway_link/motorway/service/street/main/path/major_rail)
+ * │   ├── admin (国界线/行政边界/海岸线)
+ * │   ├── country_label (scalerank 1~4)
+ * │   ├── marine_label (labelrank 1~4)
+ * │   ├── place_label (city/town/village/hamlet/suburb/neighbourhood)
+ * │   ├── poi_label (scalerank 1~5, maki 图标)
+ * │   └── 默认样式 (fallback)
+ * │
+ * 3. 对外暴露
+ *    └── window.mvt = { create, StreetsV6Style }
+ *
+ * ==========================================================================
+ * 🚀 调用方法
+ * ==========================================================================
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * 【方法一】使用内置 Mapbox Streets V6 样式（快速使用）
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ *   // 1. 创建样式函数
+ *   var styleFunc = mvt.StreetsV6Style();
+ *
+ *   // 2. 创建 MVT Provider 并添加到 Cesium
+ *   var mvtProvider = mvt.create({
+ *       url: "https://a.tiles.mapbox.com/v4/mapbox.mapbox-streets-v6/{z}/{x}/{y}.vector.pbf?access_token={k}",
+ *       key: "你的MapboxAccessToken",
+ *       style: function() { return styleFunc; },  // 注意：style 是返回样式函数的函数
+ *       tileWidth: 512,
+ *       tileHeight: 512
+ *   });
+ *
+ *   // 3. 作为 ImageryProvider 添加到 Viewer
+ *   viewer.imageryLayers.addImageryProvider(mvtProvider);
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * 【方法二】使用自定义样式函数（灵活定制）
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ *   // 1. 编写自定义样式函数
+ *   //    签名: function(feature, resolution) → ol.style.Style[]
+ *   function myCustomStyle(feature, resolution) {
+ *       var styles = [];
+ *       var layer = feature.get('layer');
+ *       var type  = feature.get('type');
+ *
+ *       if (layer === 'water') {
+ *           styles.push(new ol.style.Style({
+ *               fill: new ol.style.Fill({ color: '#a0c8f0' })
+ *           }));
+ *       } else if (layer === 'road') {
+ *           styles.push(new ol.style.Style({
+ *               stroke: new ol.style.Stroke({ color: '#333', width: 2 })
+ *           }));
+ *       } else if (layer === 'building') {
+ *           styles.push(new ol.style.Style({
+ *               fill: new ol.style.Fill({ color: '#f2eae2' }),
+ *               stroke: new ol.style.Stroke({ color: '#dfdbd7', width: 1 })
+ *           }));
+ *       }
+ *       return styles;
+ *   }
+ *
+ *   // 2. 创建 Provider
+ *   var mvtProvider = mvt.create({
+ *       url: "http://your-server/tiles/{z}/{x}/{y}.pbf",
+ *       key: "",
+ *       style: function() { return myCustomStyle; },
+ *       tileWidth: 256,
+ *       tileHeight: 256,
+ *       tilingScheme: new Cesium.WebMercatorTilingScheme()
+ *   });
+ *
+ *   // 3. 添加到 Viewer
+ *   var layer = viewer.imageryLayers.addImageryProvider(mvtProvider);
+ *   layer.alpha = 0.8;  // 可调整透明度
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * 【方法三】使用自建矢量瓦片服务 (GeoServer / Tiler / 其他)
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ *   var mvtProvider = mvt.create({
+ *       url: "http://localhost:8080/geoserver/gwc/service/tms/1.0.0/" +
+ *            "namespace:layername@EPSG:900913@pbf/{z}/{x}/{y}.pbf",
+ *       key: "",
+ *       style: function() { return myCustomStyle; },
+ *       tileWidth: 256,
+ *       tileHeight: 256
+ *   });
+ *   viewer.imageryLayers.addImageryProvider(mvtProvider);
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * 【参数详细说明】 mvt.create(options)
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ *   @param {Object} options - 配置对象
+ *
+ *   @param {string} options.url
+ *     MVT 瓦片服务 URL 模板。
+ *     支持的占位符: {z} 层级, {x} 列号, {y} 行号, {k} 密钥
+ *     默认: "https://a.tiles.mapbox.com/v4/mapbox.mapbox-streets-v6/{z}/{x}/{y}.vector.pbf?access_token={k}"
+ *
+ *   @param {string} options.key
+ *     服务访问令牌，用于替换 URL 中的 {k} 占位符。
+ *     默认: ""
+ *
+ *   @param {Function} options.style  [必须]
+ *     样式工厂函数，调用后返回一个样式分发函数。
+ *     签名: function() → function(feature, resolution) → ol.style.Style[]
+ *     注意：外层是工厂函数，内层才是真正的样式函数。
+ *
+ *   @param {number} [options.tileWidth=512]
+ *     瓦片渲染宽度（像素），建议 256 或 512。
+ *
+ *   @param {number} [options.tileHeight=512]
+ *     瓦片渲染高度（像素），建议与 tileWidth 一致。
+ *
+ *   @param {Cesium.TilingScheme} [options.tilingScheme]
+ *     瓦片分割方案。默认: WebMercatorTilingScheme
+ *     可选: GeographicTilingScheme（经纬度切片）
+ *
+ *   @param {Cesium.Ellipsoid} [options.ellipsoid]
+ *     椭球体参数，传递给 tilingScheme。
+ *
+ *   @returns {MVTProvider} 实现了 Cesium ImageryProvider 接口的对象
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * 【样式函数编写规范】
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ *   样式分发函数签名:
+ *     function(feature: ol.Feature, resolution: number) → ol.style.Style[]
+ *
+ *   feature 常用属性获取:
+ *     feature.get('layer')      — 图层名 (如 'road', 'water', 'building')
+ *     feature.get('class')      — 分类 (如 'motorway', 'street')
+ *     feature.get('type')       — 类型 (如 'city', 'town')
+ *     feature.get('name')       — 名称
+ *     feature.get('name_en')    — 英文名
+ *     feature.getGeometry()     — 几何对象
+ *     feature.getGeometry().getType() — 几何类型 ('Point','LineString','Polygon')
+ *
+ *   resolution 参数:
+ *     当前缩放级别对应的分辨率（米/像素），数值越小表示越放大。
+ *     可用于控制要素在不同缩放级别的显示/隐藏。
+ *
+ *   返回值:
+ *     必须返回 ol.style.Style 对象数组。
+ *     返回空数组 [] 表示不渲染该要素。
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * 【内置样式覆盖的图层 (createMapboxStreetsV6Style)】
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ *   图层名              包含类别
+ *   ─────────────────────────────────────────────────
+ *   landuse            park, cemetery, hospital, school, wood
+ *   waterway           river, stream, canal, 其他
+ *   water              水体面
+ *   aeroway            Polygon(机场面), LineString(跑道线)
+ *   building           建筑面
+ *   tunnel             motorway_link, service, street, street_limited,
+ *                      main, motorway, path, major_rail
+ *   road               motorway_link, street, street_limited, main,
+ *                      motorway, path, major_rail
+ *   bridge             motorway_link, motorway, service, street,
+ *                      street_limited, main, path, major_rail
+ *   admin              国界线(admin_level=2), 行政边界(admin_level>=3),
+ *                      海岸线(maritime)
+ *   country_label      scalerank 1~4 国家名称标注
+ *   marine_label       labelrank 1~4 海洋名称标注
+ *   place_label        city, town, village, hamlet, suburb, neighbourhood
+ *   poi_label          scalerank 1~5 兴趣点图标 (maki 图标集)
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * 【注意事项】
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ *   1. 必须确保 window.ol 已加载，否则抛出异常 "请引入Openlayers库！"
+ *   2. OpenLayers 版本需包含以下模块:
+ *      - ol.format.MVT
+ *      - ol.render.canvas.ReplayGroup
+ *      - ol.renderer.vector.renderFeature_
+ *      - ol.tilegrid.resolutionsFromExtent
+ *      - ol.style.* (Fill, Stroke, Style, Text, Icon)
+ *   3. style 参数是【工厂函数】，不是直接的样式函数：
+ *      ✅ style: function() { return myStyleFunc; }
+ *      ❌ style: myStyleFunc
+ *   4. 瓦片缓存默认上限 1000，超出后自动裁剪至 500。
+ *   5. pickFeatures 未实现，始终返回 undefined（不支持要素拾取）。
+ *   6. URL 模板中 {z}/{x}/{y} 遵循 Web Mercator 瓦片编号规范。
+ *
+ * ==========================================================================
+ */
+
+
 
 (function (window) {
 

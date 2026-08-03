@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>天地图 · 六种图层控制台</title>
+  <link rel="stylesheet" href="./../../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../../libs/cesium/Cesium.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ========== 控制面板 ========== */
+    #layerPanel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 292px;
+      background: rgba(13, 19, 30, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 10px;
+      color: #e8edf4;
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+      z-index: 999;
+      user-select: none;
+    }
+
+    .panel-head {
+      padding: 15px 18px 13px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .panel-head h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .panel-head .sub {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 9.5px;
+      color: #6f83a0;
+      letter-spacing: 2px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #6f83a0;
+      letter-spacing: 3px;
+      padding: 13px 18px 6px;
+    }
+
+    /* ---- 底图卡片 ---- */
+    .mode-card {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin: 4px 11px;
+      padding: 10px 13px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-left: 3px solid transparent;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.22s ease;
+    }
+
+    .mode-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      transform: translateX(3px);
+    }
+
+    .mode-card.active {
+      background: color-mix(in srgb, var(--c) 15%, transparent);
+      border-left-color: var(--c);
+      border-color: color-mix(in srgb, var(--c) 42%, transparent);
+    }
+
+    .mode-card .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--c);
+      flex-shrink: 0;
+      box-shadow: 0 0 8px var(--c);
+      opacity: 0.35;
+      transition: opacity 0.22s;
+    }
+
+    .mode-card.active .dot {
+      opacity: 1;
+    }
+
+    .mode-name {
+      font-size: 13.5px;
+      font-weight: 700;
+    }
+
+    .mode-code {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 10.5px;
+      color: #7d90ac;
+      margin-top: 2px;
+    }
+
+    .mode-card .pair {
+      margin-left: auto;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 9.5px;
+      color: #55677f;
+      letter-spacing: 0.5px;
+    }
+
+    .mode-card.active .pair {
+      color: var(--c);
+    }
+
+    /* ---- 叠加层开关 ---- */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 4px 11px;
+      padding: 9px 13px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .switch-row:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .sw-name {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sw-name .adot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--c);
+      box-shadow: 0 0 6px var(--c);
+    }
+
+    .sw-code {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 10.5px;
+      color: #7d90ac;
+      margin-top: 2px;
+    }
+
+    .switch-row input {
+      display: none;
+    }
+
+    .slider {
+      width: 36px;
+      height: 20px;
+      border-radius: 20px;
+      flex-shrink: 0;
+      background: #33415a;
+      position: relative;
+      transition: background 0.25s;
+    }
+
+    .slider::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #aab6c9;
+      transition: all 0.25s;
+    }
+
+    .switch-row input:checked+.slider {
+      background: #2f9e6e;
+    }
+
+    .switch-row input:checked+.slider::after {
+      left: 19px;
+      background: #fff;
+    }
+
+    /* ---- 实时图层堆栈 ---- */
+    #stackBox {
+      padding: 4px 18px 12px;
+    }
+
+    .stack-chip {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 11px;
+      margin-bottom: 5px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      background: color-mix(in srgb, var(--c) 13%, rgba(255, 255, 255, 0.03));
+      border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+      border-left: 3px solid var(--c);
+      animation: chipIn 0.32s ease both;
+    }
+
+    .stack-chip .idx {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 9px;
+      color: #6f83a0;
+      width: 14px;
+    }
+
+    .stack-chip .code {
+      margin-left: auto;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 10px;
+      color: var(--c);
+      font-weight: 600;
+    }
+
+    @keyframes chipIn {
+      from {
+        opacity: 0;
+        transform: translateY(-7px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .stack-hint {
+      font-size: 9.5px;
+      color: #55677f;
+      letter-spacing: 1px;
+      text-align: right;
+      margin-top: 2px;
+      font-family: "JetBrains Mono", Consolas, monospace;
+    }
+
+    /* ---- 状态栏 ---- */
+    #statusBar {
+      padding: 10px 18px;
+      font-size: 11px;
+      color: #8fa3bf;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-family: "JetBrains Mono", Consolas, monospace;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    #statusBar b {
+      color: #5fd4a0;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="cesiumContainer"></div>
+
+  <div id="layerPanel">
+    <div class="panel-head">
+      <h1>天地图图层</h1>
+      <span class="sub">WMTS · 6 LAYERS</span>
+    </div>
+
+    <div class="section-label">底图 BASE MAP</div>
+    <div class="mode-card active" data-mode="img" style="--c:#4a9eff">
+      <span class="dot"></span>
+      <div>
+        <div class="mode-name">影像底图</div>
+        <div class="mode-code">T = img_w</div>
+      </div>
+      <span class="pair">+ cia_w</span>
+    </div>
+
+    <div class="mode-card" data-mode="vec" style="--c:#3ecf8e">
+      <span class="dot"></span>
+      <div>
+        <div class="mode-name">矢量底图</div>
+        <div class="mode-code">T = vec_w</div>
+      </div>
+      <span class="pair">+ cva_w</span>
+    </div>
+    <div class="mode-card" data-mode="ter" style="--c:#e8965a">
+      <span class="dot"></span>
+      <div>
+        <div class="mode-name">地形晕渲</div>
+        <div class="mode-code">T = ter_w</div>
+      </div>
+      <span class="pair">+ cta_w</span>
+    </div>
+
+    <div class="section-label">叠加层 OVERLAYS</div>
+    <label class="switch-row" id="annoRow" style="--c:#4a9eff">
+      <div>
+        <div class="sw-name"><span class="adot"></span>地名注记</div>
+        <div class="sw-code" id="annoCode">T = cia_w · 影像注记</div>
+      </div>
+      <input type="checkbox" id="annoToggle" checked><span class="slider"></span>
+    </label>
+
+    <label class="switch-row" style="--c:#c9a7ff">
+      <div>
+        <div class="sw-name"><span class="adot"></span>境界线</div>
+        <div class="sw-code">T = ibo_w</div>
+      </div>
+      <input type="checkbox" id="iboToggle"><span class="slider"></span>
+    </label>
+
+    <div class="section-label">实时图层堆栈 LAYER STACK</div>
+    <div id="stackBox"></div>
+
+    <div id="statusBar"></div>
+  </div>
+
+  <script type="text/javascript">
+    const tdtToken = '8c2b8afdfd321dbe7a98d7f78680ab52';
+
+    // 1. 初始化 Viewer（不加载默认底图）
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      baseLayerPicker: false, geocoder: false, homeButton: false,
+      sceneModePicker: false, navigationHelpButton: false,
+      animation: false, timeline: false, fullscreenButton: false,
+      infoBox: false, selectionIndicator: false
+    });
+    viewer.imageryLayers.removeAll();
+
+    // 2. 工厂函数：生成天地图 WMTS 图层
+    function tdtProvider(service, layer) {
+      return new Cesium.WebMapTileServiceImageryProvider({
+        url: 'https://t{s}.tianditu.gov.cn/' + service + '/wmts?tk=' + tdtToken,
+        subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
+        layer: layer,
+        style: 'default',
+        tileMatrixSetID: 'w',
+        format: 'tiles',
+        maximumLevel: 18
+      });
+    }
+
+    // 3. 三种底图 + 各自配套注记
+    const MODES = {
+      img: { color: '#4a9eff', base: 'img_w', baseLayer: 'img', anno: 'cia_w', annoLayer: 'cia', annoName: '影像注记' },
+      vec: { color: '#3ecf8e', base: 'vec_w', baseLayer: 'vec', anno: 'cva_w', annoLayer: 'cva', annoName: '矢量注记' },
+      ter: { color: '#e8965a', base: 'ter_w', baseLayer: 'ter', anno: 'cta_w', annoLayer: 'cta', annoName: '地形注记' }
+    };
+
+    let currentMode = 'img';
+    let annoOn = true; // 注记图层默认开启
+    let iboOn = false; // 境界线图层默认关闭
+
+    // 4. 渲染图层堆栈可视化（从上到下）
+    function renderStack(m) {
+      //4.1 每次清空盒子
+      const box = document.getElementById('stackBox');
+      box.innerHTML = '';
+
+      //4.2 按顺序添加,准备好盒子
+      //xxx.push 将一个或多个元素添加到数组的**末尾**，并返回该数组的**新长度
+      const stack = [];
+      if (annoOn) stack.push({ name: m.annoName, code: m.anno, c: m.color });
+      if (iboOn) stack.push({ name: '境界线', code: 'ibo_w', c: '#c9a7ff' });
+      stack.push({ name: '底图', code: m.base, c: m.color });
+
+      //4.3 forEach 遍历数组，逐个生成卡片
+      stack.forEach((item, i) => {         //遍历数组，item 是当前图层对象，i 是索引（0,1,2）
+        const chip = document.createElement('div');  //在内存中新建一个 <div> 元素（此时还没挂到页面上）
+        chip.className = 'stack-chip';    // 给它加上 已有的CSS 类，让样式表里的卡片样式生效
+        chip.style.setProperty('--c', item.c);   //把颜色写入 CSS 自定义属性 --c
+        chip.style.animationDelay = (i * 0.06) + 's';  //设置入场动画延迟，做出"逐张滑落"的瀑布效果
+        chip.innerHTML =
+          '<span class="idx">' + (i + 1) + '</span>' +
+          '<span>' + item.name + '</span>' +
+          '<span class="code">' + item.code + '</span>';
+        box.appendChild(chip);   //把卡片真正插入到页面容器中
+      });
+
+      //4.4 底部提示文字
+      const hint = document.createElement('div');
+      hint.className = 'stack-hint';
+      hint.textContent = '▲ 上层覆盖下层';
+      box.appendChild(hint);
+    }
+
+    // 5. 核心：按当前状态重建图层
+    function render() {
+      const m = MODES[currentMode];
+      viewer.imageryLayers.removeAll();
+
+      // 叠加顺序：底图 → 境界线 → 注记（后加的显示在上层）
+     
+      /*天地图的命名有个"小坑"，URL 路径和 WMTS 协议参数写法不一样：
+        url:   'https://t0.tianditu.gov.cn/img_w/wmts...'   // 服务名带 _w 后缀
+        layer: 'img'                                        // WMTS layer 参数不带 _w
+
+        故:  base:'img_w'（给 URL 用）+ baseLayer:'img'（给 layer 参数用）  */
+      viewer.imageryLayers.addImageryProvider(tdtProvider(m.base, m.baseLayer)); //是前面定义过的底图 function tdtProvider(service, layer) {
+      if (iboOn) viewer.imageryLayers.addImageryProvider(tdtProvider('ibo_w', 'ibo'));
+      if (annoOn) viewer.imageryLayers.addImageryProvider(tdtProvider(m.anno, m.annoLayer));
+
+      // 同步面板 UI（注记开关自动配对）
+      document.getElementById('annoCode').textContent = 'T = ' + m.anno + ' · ' + m.annoName; //annoCode:注记对应的div
+      document.getElementById('annoRow').style.setProperty('--c', m.color); //annoRow:注记对应的div的label,此处改颜色
+
+      // 更新堆栈可视化 + 状态栏
+      renderStack(m);
+      const parts = [m.base];
+      if (iboOn) parts.push('ibo_w');
+      if (annoOn) parts.push(m.anno);
+      document.getElementById('statusBar').innerHTML = '当前加载：<b>' + parts.join(' + ') + '</b>';
+    }
+
+    // 6. 绑定交互
+    document.querySelectorAll('.mode-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        currentMode = card.dataset.mode;
+        render();
+      });
+    });
+    document.getElementById('annoToggle').addEventListener('change', e => { annoOn = e.target.checked; render(); });
+    document.getElementById('iboToggle').addEventListener('change', e => { iboOn = e.target.checked; render(); });
+
+    // 7. 初始视角 + 首次渲染
+    render();
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(104.0, 35.0, 6000000)  // 中国全境
+    });
+
+    console.log('✅ 天地图六图层控制台已就绪（含 cta_w 地形注记）');
+  </script>
+</body>
+
+</html>

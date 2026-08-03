@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Cesium 显示mvt文件</title>
+  <link rel="stylesheet" href="./../../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../../libs/cesium/Cesium.js"></script>
+
+  <script src="./../../../libs/JS/CesiumVectorTile.js/CesiumVectorTile.min.js"></script>
+  <script src="./../../../libs/JS/ol.js"></script>
+  <script src="./../../../libs/JS/mvt.js"></script>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+
+  <script type="text/javascript">
+
+    const viewer = new Cesium.Viewer('map', {
+      // 去掉对话框警告
+      infoBox: false,
+      // 是否显示查询按钮
+      geocoder: false,
+      // 不显示home按钮
+      homeButton: false,
+      // 控制查看器的显示模式（3D、2.5D、2D是否显示）
+      sceneModePicker: false,
+      // 是否显示图层选择
+      baseLayerPicker: false,
+      // 是否显示帮助按钮
+      navigationHelpButton: false,
+      // 是否显示播放动画、计时
+      animation: false,
+      // 是否显示时间轴
+      timeline: false,
+      // 是否显示全屏按钮
+      fullscreenButton: false,
+
+    });
+    //隐藏 Cesium 的版权信息水印。
+    viewer.cesiumWidget.creditContainer.style.display = "none";
+    //  viewer.scene.debugShowFramesPerSecond = true;
+
+       // 天地图影像底图（卫星图）
+        const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+          //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+          //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+          url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+          layer: "img",
+          style: "default",
+          tileMatrixSetID: "w",
+          format: "tiles",
+          maximumLevel: 18
+        });
+        viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+    // 开启帧率
+    viewer.scene.debugShowFramesPerSecond = true;
+
+    // var mvtLayer = mvt.create({
+    //     url: 'https://a.tiles.mapbox.com/v4/mapbox.mapbox-streets-v6/{z}/{x}/{y}.vector.pbf?access_token={k}',
+    //     key: 'pk.eyJ',
+    //     style: mvt.StreetsV6Style
+    // });
+    // viewer.imageryLayers.addImageryProvider(mvtLayer)
+
+    // 样式要修改mvt.js文件
+    var mvtLayer = mvt.create({
+      // url: 'http://58.218.244.204:30080/dynamic_vector/server/maps/l081dbd44d0ce1000/tiles?type=1&z={z}&x={x}&y={y}',
+      url: 'https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf',
+      style: mvt.StreetsV6Style
+    });
+    viewer.imageryLayers.addImageryProvider(mvtLayer)
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(111.5, 30.5, 50000.0)
+    });
+
+  </script>
+</body>
+
+</html>

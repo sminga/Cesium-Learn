@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="./../../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../../libs/cesium/Cesium.js"></script>
+  <script src="./../../../libs/JS/latlng.js"></script>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="cesiumContainer" style="margin: 0 auto; width: 100%; height: 100%"></div>
+  <script type="text/javascript">
+//教程：https://blog.csdn.net/qq_28372005/article/details/159215052
+
+  // --- 在 <script> 标签内编写以下代码 ---
+
+    // 1. 填入你自己的天地图浏览器端Key
+    //const tdtToken = 'YOUR_TDT_TOKEN_HERE'; // 请替换为你在天地图申请的Key
+    const tdtToken = '8c2b8afdfd321dbe7a98d7f78680ab52'; // 请替换为你在天地图申请的Key
+    
+    // 2. 初始化Cesium Viewer
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      // 简化UI，让界面更清爽
+      baseLayerPicker: false,   // 关闭底图选择器
+      geocoder: false,          // 关闭地理编码器
+      homeButton: true,
+      sceneModePicker: true,
+      navigationHelpButton: false,
+      animation: false,
+      timeline: false,
+      fullscreenButton: false
+    });
+
+    // 3. 构建天地图影像图层提供器
+    const tdtImgProvider = new Cesium.UrlTemplateImageryProvider({
+      // 天地图影像瓦片URL模板（关键！）
+      // 参数说明：T=img_w 表示影像底图；x,y,z为行列号与层级；tk=你的密钥
+      //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+      url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=8c2b8afdfd321dbe7a98d7f78680ab52' ,
+
+          /*
+          T=img_w参数：指定服务类型。天地图提供了多种图层，通过修改这个参数即可切换：
+            img_w：全球影像底图
+            vec_w：全球矢量底图（道路、行政边界等）
+            cia_w：影像注记（标注地名）
+            cva_w：矢量注记
+            ter_w：地形晕渲
+            cta_w：地形注记
+          */
+
+          /*
+          // 组合 A：卫星影像模式（类似 Google 卫星图）
+          img_w（影像底图）  +  cia_w（影像注记）
+
+          // 组合 B：标准地图模式（类似高德/百度普通图）
+          vec_w（矢量底图）  +  cva_w（矢量注记）
+
+          // 组合 C：地形模式（看山脉地势）
+          ter_w（地形晕渲）  +  cta_w（地形注记）
+
+          // 组合 D：卫星图 + 行政边界
+          img_w + cia_w + ibo_w（境界线）
+          */
+
+      // 子域列表，用于负载均衡，加速瓦片加载
+      subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
+      // 投影方式：天地图在线服务使用Web墨卡托投影(EPSG:3857)
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      // 最大缩放级别（天地图影像一般支持18级）
+      maximumLevel: 18,
+      // 最小缩放级别
+      minimumLevel: 1
+    });
+
+    // 4. 将图层添加到Viewer中
+    viewer.imageryLayers.addImageryProvider(tdtImgProvider);
+
+    // 5. 可选：移除Cesium默认加载的底图（如果不移除，会有两层底图）
+    viewer.imageryLayers.remove(viewer.imageryLayers.get(0));
+
+    // 6. 设置初始视角（比如定位到北京）
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(116.397, 39.907, 5000000) // 经度, 纬度, 高度（米）
+    });
+
+    console.log('✅ 天地图影像加载成功！');
+
+
+
+  
+  </script>
+</body>
+
+</html>
