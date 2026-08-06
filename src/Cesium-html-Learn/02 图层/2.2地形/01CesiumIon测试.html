@@ -104,12 +104,13 @@
         viewer.imageryLayers.addImageryProvider(tiandituCiaLayer);
 
         
-     
+        // 地形夸张
+        viewer.scene.globe.terrainExaggeration = 10;
 
         // 6. 加载 3D Tiles
         const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(96188);
         viewer.scene.primitives.add(tileset);
-        await viewer.zoomTo(tileset);
+       
 
         // 应用默认样式
         const extras = tileset.asset.extras;
