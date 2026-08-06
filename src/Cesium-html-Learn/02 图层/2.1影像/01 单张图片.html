@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>影像加载_单张图片底图加载</title>
+  <link rel="stylesheet" href="./../../../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../../../libs/cesium/Cesium.js"></script>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+  <script type="text/javascript">
+
+    const viewer = new Cesium.Viewer('map', {
+
+      // 去掉对话框警告
+      infoBox: false,
+      // 是否显示查询按钮
+      geocoder: false,
+      // 不显示home按钮
+      homeButton: false,
+      // 控制查看器的显示模式（3D、2.5D、2D是否显示）
+      sceneModePicker: false,
+      // 是否显示图层选择
+      baseLayerPicker: false,
+      // 是否显示帮助按钮
+      navigationHelpButton: false,
+      // 是否显示播放动画、计时
+      animation: false,
+      // 是否显示时间轴
+      timeline: false,
+      // 是否显示全屏按钮
+      fullscreenButton: false,
+
+    });
+    //隐藏 Cesium 的版权信息水印。
+    viewer.cesiumWidget.creditContainer.style.display = "none";
+    // 开启帧率
+    viewer.scene.debugShowFramesPerSecond = true;
+
+
+    viewer.imageryLayers.remove(viewer.imageryLayers.get(0));
+    // 天地图影像底图（卫星图）
+    const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+      //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+      //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+      url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+      layer: "img",
+      style: "default",
+      tileMatrixSetID: "w",
+      format: "tiles",
+      maximumLevel: 18
+    });
+    viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+
+
+//<-----------1.整张地图----------------------------------------------------------------------------------------------------------------------------------------------------------------------->
+    var imageryProvider = new Cesium.SingleTileImageryProvider({
+      "url": "./../../../../libs/Picture/world_b.jpg",
+    })
+
+    let options = {
+      alpha: 0.9,
+      hue: 0.3, //设置图层的色调偏移。0.3 表示将图片的色调在色轮上旋转 0.3 弧度，这会改变图片的整体颜色倾向（例如偏绿或偏紫）。
+      saturation: 0.3, //设置图层的饱和度。0.3 表示大幅降低饱和度（默认值是 1），这会让图片看起来颜色变淡，接近灰度图的效果。
+      gamma: 0.3, //设置图层的伽玛校正。0.3 会使图像的非线性亮度发生显著变化（通常会让暗部变亮或整体对比度变柔和），默认值是 1。
+    }
+
+    var imageryLayer = new Cesium.ImageryLayer(imageryProvider, options);
+    viewer.imageryLayers.add(imageryLayer)
+    imageryLayer.alpha = 0.8
+
+//<-----------2.整张地图----------------------------------------------------------------------------------------------------------------------------------------------------------------------->
+    //左下角坐标，右上角坐标 这个矩形将用于定义图片在地图上的显示范围
+    var rectangle = Cesium.Rectangle.fromDegrees(114.38004, 30.51667, 114.40471, 30.53045); //设置图片范围 矩形框
+    viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
+      url: "./RasterImage/图片/single.jpg",
+      rectangle: rectangle //设置图片范围
+    }))
+    viewer.camera.setView({
+      destination: Cesium.Rectangle.fromDegrees(114.38004, 30.51667, 114.40471, 30.53045) // 指定为经度和纬度坐标的二维区域
+    });
+
+  </script>
+</body>
+
+</html>

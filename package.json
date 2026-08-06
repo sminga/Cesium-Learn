@@ -13,6 +13,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@cesium-china/cesium-map": "^1.0.0",
+    "@dvgis/cesium-map": "^4.0.0",
     "cesium": "^1.141.0"
   },
   "devDependencies": {

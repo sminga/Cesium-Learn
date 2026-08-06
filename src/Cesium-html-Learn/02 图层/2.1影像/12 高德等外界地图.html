@@ -1,0 +1,159 @@
+<!-- // 用法
+ 阅读github介绍
+// https://github.com/jiawanlong/cesium-map
+
+| 地图服务商 | 对应类名 | 关键参数说明 |
+
+| 高德地图 | `AMapImageryProvider`    | `style`: `img`(影像),      `elec`(电子/矢量), `cva`(注记) 
+| 百度地图 | `BaiduImageryProvider`   | `style`: `img`(影像),       `vec`(矢量),      `normal`(普通) 
+| 天地图   | `TdtImageryProvider`     | `style`: `vec`(矢量),       `img`(影像),      `ter`(地形),    `cia`(注记) 
+| 腾讯地图 | `TencentImageryProvider` | `style`: `img`(影像),       `1`(经典) 
+| 谷歌地图 | `GoogleImageryProvider`  | `style`: `elec`(电子/矢量), `img`(影像),       `ter`(地形) 
+| 星图地图 | `GeoVisImageryProvider`  | `style`: `vec`(矢量),       `img`(影像),       `ter`(地形)
+
+
+| 地图类型    | Style 参数                    | 层级属性 | 建议添加顺序 |
+| :---       | :---                          | :---    | :--- |
+| 影像图      | `img`                        | 底层     | 第 1 个添加 |
+| 矢量/电子图 | `elec`, `vec`, `normal`, `1` | 底层     | 第 1 个添加 (与影像互斥，二选一) |
+| 地形图      | `ter`                        | 底层     | 第 1 个添加 (通常配合高程使用) |
+| 注记/路网   | `cva`, `cia`                 | 顶层     | 最后 1 个添加 |
+
+
+
+
+npm install @cesium-china/cesium-map
+ -->
+
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="./../../../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../../../libs/cesium/Cesium.js"></script>
+  <script src="./../../../../node_modules/@cesium-china/cesium-map/dist/cesium.map.min.js"></script>
+</head>
+
+<body style="
+      margin: 0;
+      overflow: hidden;
+      background: #fff;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+    ">
+  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+  <!-- 2. 将 type 修改为 "module" -->
+  <script type="module">
+
+    // import { AMapImageryProvider, BaiduImageryProvider, GeoVisImageryProvider } from '@cesium-china/cesium-map'
+
+    const viewer = new Cesium.Viewer("map", {
+          // 去掉对话框警告
+      infoBox: false,
+      // 是否显示查询按钮
+      geocoder: false,
+      // 不显示home按钮
+      homeButton: true,
+      // 控制查看器的显示模式（3D、2.5D、2D是否显示）
+      sceneModePicker: true,
+      // 是否显示图层选择
+      baseLayerPicker: false,
+      // 是否显示帮助按钮
+      navigationHelpButton: false,
+      // 是否显示播放动画、计时
+      animation: false,
+      // 是否显示时间轴
+      timeline: false,
+      // 是否显示全屏按钮
+      fullscreenButton: false,
+
+    });
+            //隐藏 Cesium 的版权信息水印。
+            viewer.cesiumWidget.creditContainer.style.display = "none";
+     // 开启帧率
+     viewer.scene.debugShowFramesPerSecond = true;
+
+
+    // 清除默认底图 
+    viewer.imageryLayers.remove(viewer.imageryLayers.get(0));
+
+   
+    // ==================== 1. 高德地图 (AMap) ====================
+    // 支持样式: img(影像), elec(电子地图), cva(注记)
+    // 默认坐标系为 GCJ02，设置 crs: 'WGS84' 时插件会自动纠偏
+    
+    // viewer.imageryLayers.addImageryProvider(new Cesium.AMapImageryProvider({
+    //     style: 'elec',     // 影像图
+    //     crs: 'WGS84'      // 强制使用 WGS84 坐标系
+    // }));
+    
+
+
+    // ==================== 2. 百度地图 (Baidu) ====================
+    // 支持样式: img(影像), vec(矢量), normal(普通), dark(暗黑)
+    // 默认坐标系为 BD09，设置 crs: 'WGS84' 时插件会自动纠偏
+    /*
+    viewer.imageryLayers.addImageryProvider(new Cesium.BaiduImageryProvider({
+        style: 'normal',  // 普通电子地图
+        crs: 'WGS84'      // 强制使用 WGS84 坐标系
+    }));
+    */
+
+
+    // ==================== 3. 天地图 (Tdt) ====================
+    // 支持样式: vec(矢量), img(影像), cia(注记), ter(地形)
+    // ⚠️ 注意：使用前必须去天地图官网申请 Key
+    // 此处ter 是地形图平面，通常配合高程使用
+
+    // viewer.imageryLayers.addImageryProvider(new Cesium.TdtImageryProvider({
+    //     style: 'ter',     // 地形图
+    //     crs: 'WGS84',     // 强制使用 WGS84 坐
+    //     key: '8c2b8afdfd321dbe7a98d7f78680ab52' // 替换为真实的 Key
+    //     // key: '你的天地图Key' // 替换为真实的 Key
+    // }));
+    
+
+
+    // ==================== 4. 腾讯地图 (Tencent) ====================
+    // 支持样式: 1(经典), img(影像)
+    // 默认坐标系为 GCJ02，设置 crs: 'WGS84' 时插件会自动纠偏
+    
+    viewer.imageryLayers.addImageryProvider(new Cesium.TencentImageryProvider({
+        style: 1,         // 经典样式
+        crs: 'WGS84'      // 强制使用 WGS84 坐标系
+    }));
+    
+
+
+    // ==================== 5. 谷歌地图 (Google) ====================
+    // 支持样式: elec(电子), img(影像), ter(地形), cva(注记)
+    // 默认坐标系为 GCJ02，设置 crs: 'WGS84' 时插件会自动纠偏
+    /*
+    viewer.imageryLayers.addImageryProvider(new Cesium.GoogleImageryProvider({
+        style: 'elec',    // 电子地图
+        crs: 'WGS84'      // 强制使用 WGS84 坐标系
+    }));
+    */
+
+
+    // ==================== 6. 星图地图 (GeoVis) ====================
+    // 支持样式: vec(矢量), img(影像), ter(地形), cia(注记)
+    // ⚠️ 注意：使用前必须去星图官网申请 Key
+    /*
+    viewer.imageryLayers.addImageryProvider(new Cesium.GeoVisImageryProvider({
+        style: 'vec',     // 矢量底图
+        key: '你的星图Key', // 替换为真实的 Key
+        format: 'png'     // 影像图可设为 'webp'
+    }));
+    */
+  </script>
+</body>
+
+</html>
