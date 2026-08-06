@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="./../../../../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../../../libs/cesium/Cesium.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #fff;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+    }
+
+    #map {
+      margin: 0 auto;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+
+  <script>
+    // 1. 设置 Token
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZDE2NTBjZi1jNGIyLTRlYmQtOTE5NS1iMGEzMjZkYzY2ZDciLCJpZCI6MzcxODU1LCJpYXQiOjE3NzU2MzYwOTF9.-vafpENPNz2ukkC8Y9Y3iDJdCGnZiPpGJatyZ7mfqYU';
+
+    // 2. 使用 async 自执行函数包裹所有 await 代码
+    (async () => {
+      try {
+        // 3. 先异步获取地形 Provider
+        const terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
+
+        // 4. 初始化 Viewer，直接传入获取好的地形
+        const viewer = new Cesium.Viewer('map', {
+          infoBox: false,
+          geocoder: false,
+          homeButton: true,
+          sceneModePicker: true,
+          baseLayerPicker: false,
+          navigationHelpButton: false,
+          animation: false,
+          timeline: false,
+          fullscreenButton: false,
+          terrainProvider: terrainProvider, // 使用上面 await 得到的结果
+          // 注意：如果你用了 baseLayerPicker: false，通常需要手动指定 imageryProvider
+          // 否则默认会加载 Bing Maps，可能会因为没有 Token 而显示黑屏或报错
+          imageryProvider: false // 先设为 false，下面手动加天地图
+        });
+
+        // 隐藏版权信息
+        viewer.cesiumWidget.creditContainer.style.display = "none";
+        // 开启帧率
+        viewer.scene.debugShowFramesPerSecond = true;
+
+        // 开启深度检测
+        viewer.scene.globe.depthTestAgainstTerrain = true;
+
+        // --- 删除了原来的 EllipsoidTerrainProvider 覆盖代码 ---
+        // 因为你上面已经加载了 Ion 地形，这里再覆盖成平地就矛盾了
+
+        // 天地图影像底图（卫星图）
+        const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+          //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+          //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+          url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+          layer: "img",
+          style: "default",
+          tileMatrixSetID: "w",
+          format: "tiles",
+          maximumLevel: 18
+        });
+        viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+
+        //    // 天地图矢量底图（街道图）
+        // const vecLayer = new Cesium.WebMapTileServiceImageryProvider({
+        //   url: "https://t{s}.tianditu.gov.cn/vec_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+        //   subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+        //   layer: "vec",
+        //   style: "default",
+        //   tileMatrixSetID: "w",
+        //   format: "tiles",
+        //   maximumLevel: 18
+        // });
+        // viewer.imageryLayers.addImageryProvider(vecLayer);
+        
+        
+        // 天地图影像注记（卫星图上的标注）
+        const tiandituCiaLayer = new Cesium.WebMapTileServiceImageryProvider({
+          //url: "https://t0.tianditu.gov.cn/cia_w/wmts?tk=你的Key", //修改成自己的token
+          url: "https://t0.tianditu.gov.cn/cia_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+          layer: "cia",
+          style: "default",
+          tileMatrixSetID: "w",
+          format: "tiles",
+          maximumLevel: 18
+        });
+        viewer.imageryLayers.addImageryProvider(tiandituCiaLayer);
+
+        
+     
+
+        // 6. 加载 3D Tiles
+        const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(96188);
+        viewer.scene.primitives.add(tileset);
+        await viewer.zoomTo(tileset);
+
+        // 应用默认样式
+        const extras = tileset.asset.extras;
+        if (
+          Cesium.defined(extras) &&
+          Cesium.defined(extras.ion) &&
+          Cesium.defined(extras.ion.defaultStyle)
+        ) {
+          tileset.style = new Cesium.Cesium3DTileStyle(extras.ion.defaultStyle);
+        }
+
+      } catch (error) {
+        console.error("加载出错:", error);
+      }
+    })();
+  </script>
+</body>
+
+</html>

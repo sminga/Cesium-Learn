@@ -62,54 +62,54 @@
     });
 
 
-    // 天地图矢量底图（街道图）
-    const vecLayer = new Cesium.WebMapTileServiceImageryProvider({
-      url: "https://t{s}.tianditu.gov.cn/vec_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
-      subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
-      layer: "vec",
-      style: "default",
-      tileMatrixSetID: "w",
-      format: "tiles",
-      maximumLevel: 18
-    });
+    // // 天地图矢量底图（街道图）
+    // const vecLayer = new Cesium.WebMapTileServiceImageryProvider({
+    //   url: "https://t{s}.tianditu.gov.cn/vec_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+    //   subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+    //   layer: "vec",
+    //   style: "default",
+    //   tileMatrixSetID: "w",
+    //   format: "tiles",
+    //   maximumLevel: 18
+    // });
 
 
 
-    //地形晕渲 ter_w（山体光影）
-    const terLayer = new Cesium.WebMapTileServiceImageryProvider({
-      url: "https://t{s}.tianditu.gov.cn/ter_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
-      subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
-      layer: "ter",
-      style: "default",
-      tileMatrixSetID: "w",
-      format: "tiles",
-      maximumLevel: 18
-    });
+    // //地形晕渲 ter_w（山体光影）
+    // const terLayer = new Cesium.WebMapTileServiceImageryProvider({
+    //   url: "https://t{s}.tianditu.gov.cn/ter_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+    //   subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+    //   layer: "ter",
+    //   style: "default",
+    //   tileMatrixSetID: "w",
+    //   format: "tiles",
+    //   maximumLevel: 18
+    // });
 
 
-    // 矢量注记 cva_w（⚠️ 必须先有 vec_w 底图）
-    const cvaLayer = new Cesium.WebMapTileServiceImageryProvider({
-      url: "https://t{s}.tianditu.gov.cn/cva_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
-      subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
-      layer: "cva",
-      style: "default",
-      tileMatrixSetID: "w",
-      format: "tiles",
-      maximumLevel: 18
-    });
+    // // 矢量注记 cva_w（⚠️ 必须先有 vec_w 底图）
+    // const cvaLayer = new Cesium.WebMapTileServiceImageryProvider({
+    //   url: "https://t{s}.tianditu.gov.cn/cva_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+    //   subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+    //   layer: "cva",
+    //   style: "default",
+    //   tileMatrixSetID: "w",
+    //   format: "tiles",
+    //   maximumLevel: 18
+    // });
 
 
 
-    // 地形注记 cta_w（⚠️ 必须先有 ter_w 地形晕渲底图）
-    const ctaLayer = new Cesium.WebMapTileServiceImageryProvider({
-      url: "https://t{s}.tianditu.gov.cn/cta_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
-      subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
-      layer: "cta",
-      style: "default",
-      tileMatrixSetID: "w",
-      format: "tiles",
-      maximumLevel: 18
-    });
+    // // 地形注记 cta_w（⚠️ 必须先有 ter_w 地形晕渲底图）
+    // const ctaLayer = new Cesium.WebMapTileServiceImageryProvider({
+    //   url: "https://t{s}.tianditu.gov.cn/cta_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52",
+    //   subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+    //   layer: "cta",
+    //   style: "default",
+    //   tileMatrixSetID: "w",
+    //   format: "tiles",
+    //   maximumLevel: 18
+    // });
 
 
     //注记必须配对	img_w+cia_w、vec_w+cva_w、ter_w+cta_w，配错会看不清文字
