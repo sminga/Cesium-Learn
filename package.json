@@ -18,6 +18,8 @@
     "cesium": "^1.141.0"
   },
   "devDependencies": {
+    "vite": "^8.2.0",
+    "vite-plugin-cesium": "^1.2.23",
     "webpack": "^5.106.2",
     "webpack-cli": "^7.0.2"
   }

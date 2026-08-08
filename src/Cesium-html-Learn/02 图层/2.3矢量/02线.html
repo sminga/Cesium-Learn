@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="./../../libs/cesium/Cesium1.98/Widgets/widgets.css">
+  <script type="text/javascript" src="./../../libs/cesium/Cesium1.98/Cesium.js"></script>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+  <script type="text/javascript">
+
+    const viewer = new Cesium.Viewer('map', {
+      imageryProvider: false,
+      baseLayerPicker: false,
+    });
+
+    var xyz = new Cesium.UrlTemplateImageryProvider({
+      "url": 'https://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c1e7bf15c41cc47dc8889ebe2399ced4'
+    })
+    viewer.imageryLayers.addImageryProvider(xyz)
+
+    // Cesium地形
+    viewer.terrainProvider = new Cesium.CesiumTerrainProvider({
+      url: '//data.mars3d.cn/terrain'
+    });
+    // 深度监测
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+
+
+    // 贴地
+    var hello = viewer.entities.add({
+      name: 'hello world',
+      polyline: {
+        positions: Cesium.Cartesian3.fromDegreesArray([-77, 35, -80, 35, -90, 45]),
+        width: 3,
+        material: Cesium.Color.RED,
+        clampToGround: true,//贴地画线
+      }
+    });
+
+    // 不贴地
+    var world = viewer.entities.add({
+      name: 'hello world',
+      polyline: {
+        positions: Cesium.Cartesian3.fromDegreesArray([-77, 30, -80, 30, -90, 40]),
+        width: 3,
+        material: Cesium.Color.BLUE,
+        clampToGround: false,
+      }
+    });
+
+    // 不贴地2
+    var start = Cesium.Cartesian3.fromDegrees(-57, 30, 2800.0);
+    var end = Cesium.Cartesian3.fromDegrees(-70, 40, 300000.0);
+
+    var world = viewer.entities.add({
+      name: 'hello world',
+      polyline: {
+        positions: [start, end],
+        width: 3,
+        material: Cesium.Color.BLUE,
+        clampToGround: false,
+      }
+    });
+
+  </script>
+</body>
+
+</html>
