@@ -56,23 +56,25 @@
     <p>点击下方链接查看具体效果：</p>
     <ul>
       <!-- 注意：这里的路径要对应你 src 文件夹里的实际文件名 -->
-      
-      <li><a href="/01_03.html" >01 天地图快捷按钮切换</a></li>
-      <li><a href="/05_01.html"  >02 点击获得经纬度</a></li>
-      <li><a href="/02_03.html" >03 AI 本地地形加载</a></li>
+      <!-- 注意：这里的路径要对应你 public 文件夹里的实际文件名，但不要写 public 前缀。 -->
+      <!-- 例如：01_03.html 对应 public/01_03.html   -->
+      <!-- 代码中点击不会正确跳转，但服务器能正常读取  -->
+      <li><a href="/01_03.html">01 天地图快捷按钮切换</a></li>
+      <li><a href="/05_01.html">02 点击获得经纬度</a></li>
+      <li><a href="/02AI.html">03 AI 本地地形加载</a></li>
 
-    
+
       <!-- 你可以继续往下添加... -->
     </ul>
   </div>
 
   <script>
     document.querySelectorAll('a[href$=".html"]').forEach(link => {
-        link.addEventListener('click', function (e) {
-          e.preventDefault(); // 阻止框架的默认路由行为
-          window.location.href = this.href; // 强制浏览器进行整页跳转
-        });
+      link.addEventListener('click', function (e) {
+        e.preventDefault(); // 阻止框架的默认路由行为
+        window.location.href = this.href; // 强制浏览器进行整页跳转
       });
+    });
   </script>
 </body>
 
