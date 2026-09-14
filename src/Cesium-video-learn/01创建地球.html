@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document</title>
+
   <script src="./../../libs/Cesium/Cesium.js"></script> <!-- bulid文件夹下的Cesium.js,是核心功能的js文件 -->
-  <link rel="stylesheet" href="./../../../libs/Cesium/Widgets/widgets.css"> <!-- //核心样式 -->
+  <link rel="stylesheet" href="/Cesium-Learn/libs/Cesium/Widgets/widgets.css"> <!-- //核心样式 -->
+  
   <style>
     html,body,#cesiumContainer{
       width: 100%;
@@ -15,17 +17,21 @@
       overflow: hidden;
     }
   </style>
+
 </head>
 <body>
   <div id="cesiumContainer"></div>
+
   <script>
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZDE2NTBjZi1jNGIyLTRlYmQtOTE5NS1iMGEzMjZkYzY2ZDciLCJpZCI6MzcxODU1LCJpYXQiOjE3NzU2MzYwOTF9.-vafpENPNz2ukkC8Y9Y3iDJdCGnZiPpGJatyZ7mfqYU';
     //创建Cesium Viewer
+
     const viewer = new Cesium.Viewer('cesiumContainer',{
       // animation: false, //动画控制
       // baseLayerPicker: false, //图层选择控件
       // fullscreenButton: false, //全屏按钮
     });
+
   viewer.camera.setView({
     destination: Cesium.Cartesian3.fromDegrees(114.41, 34.04, 1000), // 设置相机位置为北京的经纬度坐标和高度
     orientation: { // 设置相机朝向
