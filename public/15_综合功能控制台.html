@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>综合功能控制台 · 六合一</title>
+
+  <!-- ============ 1. 公共依赖 ============ -->
+  <link rel="stylesheet" href="./../libs/cesium/Widgets/widgets.css">
+  <script type="text/javascript" src="./../libs/cesium/Cesium.js"></script>
+  <!-- axios：GeoJSON 加载需要 -->
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <!-- turf：反选遮罩合并多边形需要 -->
+  <script src="./../libs/JS/turf.min.js"></script>
+  <!-- latlng：坐标拾取可选增强（缺失会自动回退原生 API） -->
+  <script src="./../libs/JS/latlng.js"></script>
+  <!-- @cesium-china/cesium-map：多源地图（高德/百度/腾讯/谷歌/星图）所需 -->
+  <script src="./../node_modules/@cesium-china/cesium-map/dist/cesium.map.min.js"></script>
+
+  <style>
+    /* ============ 2. 公共样式 ============ */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      background: #0c1a1f; color: #dcebe8;
+    }
+
+    #cesiumContainer { position: absolute; inset: 0; }
+
+    /* 隐藏 Cesium 默认版权水印 */
+    .cesium-widget-credits, .cesium-viewer-errorPanel { display: none !important; }
+
+    /* ============ 3. 左侧主侧栏 ============ */
+    #sidebar {
+      position: absolute; top: 14px; left: 14px;
+      width: 320px; max-height: calc(100vh - 28px);
+      display: flex; flex-direction: column;
+      z-index: 999;
+      background: linear-gradient(165deg, #12262d, #0d1c22);
+      border: 1px solid #23505c;
+      border-radius: 10px;
+      box-shadow: 0 14px 36px rgba(0,0,0,.55);
+      overflow: hidden;
+    }
+
+    .sidebar-head {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid #1e4550;
+      background: linear-gradient(180deg, rgba(255,255,255,.05), transparent);
+    }
+    .sidebar-head h1 {
+      font-size: 16px; font-weight: 800; letter-spacing: .14em; color: #f2f7f5;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sidebar-head .sub {
+      font: 500 10px/1 "JetBrains Mono", Consolas, monospace;
+      letter-spacing: .3em; color: #7fa3a6; margin-top: 4px;
+    }
+
+    /* ---- 功能导航卡片 ---- */
+    #featureNav {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px; padding: 10px;
+      border-bottom: 1px solid #1e4550;
+    }
+    .nav-card {
+      padding: 8px 6px; cursor: pointer;
+      background: #132e37; border: 1px solid #23505c; border-radius: 6px;
+      text-align: center; transition: all .22s ease;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .nav-card:hover { background: #1a3a44; transform: translateY(-2px); }
+    .nav-card.active {
+      background: color-mix(in srgb, var(--c) 18%, #132e37);
+      border-color: var(--c);
+      box-shadow: 0 0 0 1px var(--c), 0 0 12px color-mix(in srgb, var(--c) 45%, transparent);
+    }
+    .nav-card .ico { font-size: 16px; line-height: 1; }
+    .nav-card .name { font-size: 11px; font-weight: 700; color: #dcebe8; }
+    .nav-card.active .name { color: var(--c); }
+
+    /* ---- 功能面板容器 ---- */
+    #panelBody {
+      flex: 1; min-height: 0; overflow-y: auto;
+      padding: 10px 12px 12px;
+    }
+    #panelBody::-webkit-scrollbar { width: 6px; }
+    #panelBody::-webkit-scrollbar-thumb { background: #24505c; border-radius: 3px; }
+    #panelBody::-webkit-scrollbar-thumb:hover { background: #ffb454; }
+
+    .feature-panel { display: none; }
+    .feature-panel.active { display: block; animation: panelIn .3s ease both; }
+    @keyframes panelIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+    .sec-t {
+      display: flex; align-items: center; gap: 8px;
+      margin: 4px 0 8px;
+      font: 700 11px "JetBrains Mono", Consolas, monospace;
+      letter-spacing: .22em; color: #ffb454;
+    }
+    .sec-t b { color: #5e8b93; font-weight: 700; }
+    .sec-t::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, #2a5a68, transparent);
+    }
+
+    .hint { font-size: 11px; color: #6f83a0; line-height: 1.55; padding: 4px 0 8px; }
+    .hint code { color: #81c784; background: rgba(129,199,132,.08); padding: 1px 4px; border-radius: 3px; }
+
+    /* ---- 通用按钮 ---- */
+    .btn {
+      width: 100%; padding: 9px 10px;
+      font: 600 12px "JetBrains Mono", Consolas, monospace;
+      letter-spacing: .12em;
+      background: #132e37; color: #dcebe8;
+      border: 1px solid #2a5a68; border-radius: 5px; cursor: pointer;
+      transition: .2s;
+    }
+    .btn:hover { background: #ffb454; border-color: #ffb454; color: #122126; }
+    .btn:disabled { opacity: .35; pointer-events: none; }
+    .btn.warn:hover { background: #ff5d5d; border-color: #ff5d5d; color: #2a0d0d; }
+    .btn.success { background: #2f9e6e; border-color: #2f9e6e; color: #fff; }
+    .btn.success:hover { background: #43a047; border-color: #43a047; color: #fff; }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+
+    /* ---- 通用拨动开关行 ---- */
+    .sw-row {
+      display: flex; align-items: center; gap: 9px;
+      padding: 7px 8px; border-radius: 4px; cursor: pointer;
+      user-select: none; transition: background .18s;
+    }
+    .sw-row:hover { background: rgba(255,180,84,.07); }
+    .sw-row input { display: none; }
+    .sw-row .track {
+      width: 34px; height: 18px; flex: none; position: relative;
+      border-radius: 18px; background: #17333c; border: 1px solid #2a5a68; transition: .25s;
+    }
+    .sw-row .knob {
+      position: absolute; top: 2px; left: 2px;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #5e8b93; transition: .28s cubic-bezier(.34,1.7,.5,1);
+    }
+    .sw-row input:checked + .track { background: #5c3c10; border-color: #ffb454; }
+    .sw-row input:checked + .track .knob {
+      left: 18px; background: #ffb454; box-shadow: 0 0 9px rgba(255,180,84,.9);
+    }
+    .sw-row .txt { font-size: 12.5px; flex: 1; }
+    .sw-row .txt small { color: #7fa3a6; font-size: 10px; margin-left: 5px; }
+
+    /* ---- 通用单选卡片（底图等） ---- */
+    .mode-card {
+      display: flex; align-items: center; gap: 11px;
+      padding: 9px 11px; margin: 4px 0;
+      border: 1px solid rgba(255,255,255,.07); border-left: 3px solid transparent;
+      border-radius: 6px; cursor: pointer; transition: all .22s ease;
+    }
+    .mode-card:hover { background: rgba(255,255,255,.06); transform: translateX(3px); }
+    .mode-card.active {
+      background: color-mix(in srgb, var(--c) 15%, transparent);
+      border-left-color: var(--c); border-color: color-mix(in srgb, var(--c) 42%, transparent);
+    }
+    .mode-card .dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--c); flex-shrink: 0; box-shadow: 0 0 8px var(--c);
+      opacity: .35; transition: opacity .22s;
+    }
+    .mode-card.active .dot { opacity: 1; }
+    .mode-card .name { font-size: 13px; font-weight: 700; }
+    .mode-card .code {
+      font: 11px "JetBrains Mono", Consolas, monospace;
+      color: #7d90ac; margin-top: 2px;
+    }
+    .mode-card .pair {
+      margin-left: auto; font: 9.5px "JetBrains Mono", Consolas, monospace;
+      color: #55677f; letter-spacing: .5px;
+    }
+    .mode-card.active .pair { color: var(--c); }
+
+    /* ---- 通用输入框 ---- */
+    .input-row { display: flex; gap: 8px; margin: 6px 0; }
+    .input-row .lbl {
+      flex: 1; display: flex; flex-direction: column; gap: 4px;
+    }
+    .input-row .lbl > span { font-size: 11px; color: #7fa3a6; }
+    .input-row input {
+      width: 100%; padding: 7px 9px;
+      background: #0d2027; border: 1px solid #2a5a68;
+      color: #dcebe8; border-radius: 4px; font-size: 12px; outline: none;
+    }
+    .input-row input:focus { border-color: #ffb454; }
+
+    /* ---- 文件选择标签 ---- */
+    .file-label {
+      display: block; padding: 10px; text-align: center;
+      background: #1976d2; color: #fff; border-radius: 5px; cursor: pointer;
+      font-size: 12.5px; font-weight: 600; transition: .2s;
+    }
+    .file-label:hover { background: #1565c0; }
+    .file-label input { display: none; }
+
+    /* ---- 图层堆栈卡片（功能1） ---- */
+    .stack-chip {
+      display: flex; align-items: center; gap: 9px;
+      padding: 7px 11px; margin-bottom: 5px; border-radius: 6px;
+      font-size: 12px; font-weight: 700;
+      background: color-mix(in srgb, var(--c) 13%, rgba(255,255,255,.03));
+      border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+      border-left: 3px solid var(--c);
+      animation: chipIn .32s ease both;
+    }
+    .stack-chip .idx {
+      font: 9px "JetBrains Mono", Consolas, monospace;
+      color: #6f83a0; width: 14px;
+    }
+    .stack-chip .code {
+      margin-left: auto;
+      font: 600 10px "JetBrains Mono", Consolas, monospace;
+      color: var(--c);
+    }
+    @keyframes chipIn {
+      from { opacity: 0; transform: translateY(-7px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .stack-hint {
+      font: 9.5px "JetBrains Mono", Consolas, monospace;
+      color: #55677f; letter-spacing: 1px;
+      text-align: right; margin-top: 2px;
+    }
+
+    /* ---- 状态栏 ---- */
+    .status-box {
+      margin-top: 8px; padding: 8px 10px;
+      background: #0d2027; border: 1px solid #1e4550;
+      border-radius: 5px;
+      font: 11px "JetBrains Mono", Consolas, monospace;
+      color: #8fa3bf; white-space: pre-wrap; word-break: break-all;
+      min-height: 32px;
+    }
+    .status-box.success { color: #81c784; border-color: #2f9e6e; }
+    .status-box.error { color: #ff5d5d; border-color: #c0392b; }
+    .status-box.info { color: #ffb74d; border-color: #24505c; }
+
+    /* ============ 4. 右下：拾取实时读数（仅 picker 激活时显示） ============ */
+    #readout {
+      position: absolute; right: 16px; bottom: 16px;
+      width: 268px; padding: 11px 13px;
+      background: linear-gradient(150deg, #12262d, #0d1c22);
+      border: 1px solid #23505c; border-radius: 8px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.45);
+      display: none; z-index: 998;
+    }
+    #readout.show { display: block; }
+    #readout.ping { animation: ping .5s ease-out; }
+    @keyframes ping {
+      0% { box-shadow: inset 0 0 0 2px rgba(255,180,84,.9), inset 0 0 26px rgba(255,180,84,.25); }
+      100% { box-shadow: inset 0 0 0 0 rgba(255,180,84,0); }
+    }
+    .ro-head {
+      display: flex; align-items: center; gap: 7px; margin-bottom: 6px;
+      font: 700 10px "JetBrains Mono", Consolas, monospace;
+      letter-spacing: .3em; color: #7fa3a6;
+    }
+    .ro-head .mode { margin-left: auto; letter-spacing: .15em; color: #ffb454; }
+    .ro-row {
+      display: flex; align-items: baseline; justify-content: space-between; padding: 2px 0;
+    }
+    .ro-k { font: 600 9.5px "JetBrains Mono", Consolas, monospace; letter-spacing: .22em; color: #6f9aa2; }
+    .ro-v {
+      font: 600 16px "JetBrains Mono", Consolas, monospace;
+      color: #ffb454; font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 12px rgba(255,180,84,.35); transition: color .3s;
+    }
+    #readout.idle .ro-v { color: #3f6670; text-shadow: none; }
+    #readout.idle .ro-head .mode { color: #4b7078; }
+
+    /* ---- LED ---- */
+    .led {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #274b55; flex: none; transition: .3s;
+    }
+    .led.on {
+      background: #43e08c; box-shadow: 0 0 8px #43e08c;
+      animation: blink 1.8s infinite;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 55% { opacity: .45; } }
+
+    /* ============ 5. 全局提示气泡 ============ */
+    #toast {
+      position: absolute; left: 50%; bottom: 30px; z-index: 30;
+      transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+      background: #132e37; border: 1px solid #ffb454; color: #ffb454;
+      font: 600 12px "JetBrains Mono", Consolas, monospace;
+      letter-spacing: .1em; padding: 9px 18px;
+      border-radius: 6px; transition: .3s;
+    }
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    /* ---- 拾取记录 ---- */
+    #logList {
+      max-height: 140px; overflow-y: auto; margin-top: 4px;
+      border-top: 1px dashed #1e4550; padding-top: 4px;
+    }
+    #logList::-webkit-scrollbar { width: 4px; }
+    #logList::-webkit-scrollbar-thumb { background: #24505c; }
+    .log-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 4px; border-bottom: 1px dashed #16333c;
+      font: 500 11px "JetBrains Mono", Consolas, monospace;
+      animation: slideIn .3s ease both;
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+    .log-idx { color: #5e8b93; flex: none; }
+    .log-ll { flex: 1; color: #dcebe8; cursor: pointer; }
+    .log-ll:hover { color: #ffb454; text-decoration: underline; }
+    .log-item button {
+      background: none; border: 1px solid transparent;
+      color: #6f9aa2; font-size: 12px; cursor: pointer; padding: 1px 4px; transition: .15s;
+    }
+    .log-item button:hover { color: #ffb454; border-color: #2a5a68; }
+    .log-empty { padding: 8px; text-align: center; font-size: 11px; color: #4b7078; }
+
+    /* ---- 最近拾取 ---- */
+    .last {
+      margin: 6px 0; padding: 8px 10px;
+      background: #0d2027; border: 1px solid #1e4550; border-left: 3px solid #ffb454; border-radius: 4px;
+    }
+    .last h3 {
+      margin: 0 0 5px; display: flex; align-items: center;
+      font: 600 10px "JetBrains Mono", Consolas, monospace;
+      letter-spacing: .24em; color: #7fa3a6;
+    }
+    .lp-row {
+      display: flex; justify-content: space-between; gap: 8px;
+      padding: 3px 0; border-top: 1px dashed #1a3a44;
+      font: 500 11px "JetBrains Mono", Consolas, monospace;
+    }
+    .lp-row:first-of-type { border-top: 0; }
+    .lp-k { color: #6f9aa2; flex: none; }
+    .lp-v { color: #ffd28a; text-align: right; word-break: break-all; }
+    .lp-empty { padding: 4px 0; font-size: 11px; color: #4b7078; }
+  </style>
+</head>
+
+<body>
+  <div id="cesiumContainer"></div>
+
+  <!-- ============ 左侧主侧栏 ============ -->
+  <aside id="sidebar">
+    <header class="sidebar-head">
+      <h1>🎛 综合功能控制台</h1>
+      <div class="sub">CESIUM · 6-IN-1 CONSOLE</div>
+    </header>
+
+    <!-- 功能导航 -->
+    <nav id="featureNav">
+      <div class="nav-card active" data-feature="basemap" style="--c:#4a9eff">
+        <span class="ico">🗺</span><span class="name">图层切换</span>
+      </div>
+      <div class="nav-card" data-feature="picker" style="--c:#ffb454">
+        <span class="ico">📍</span><span class="name">坐标拾取</span>
+      </div>
+      <div class="nav-card" data-feature="mask" style="--c:#43e08c">
+        <span class="ico">🎭</span><span class="name">反选遮罩</span>
+      </div>
+      <div class="nav-card" data-feature="gps" style="--c:#ff5d5d">
+        <span class="ico">📡</span><span class="name">本地定位</span>
+      </div>
+      <div class="nav-card" data-feature="multi" style="--c:#c9a7ff">
+        <span class="ico">🌐</span><span class="name">多源地图</span>
+      </div>
+      <div class="nav-card" data-feature="terrain" style="--c:#e8965a">
+        <span class="ico">⛰</span><span class="name">本地地形</span>
+      </div>
+    </nav>
+
+    <!-- 面板容器 -->
+    <div id="panelBody">
+      <!-- ============ 功能1：天地图图层切换 ============ -->
+      <div class="feature-panel active" id="panel-basemap">
+        <div class="sec-t"><b>01</b> 底图 BASE MAP</div>
+        <div class="mode-card active" data-mode="img" style="--c:#4a9eff">
+          <span class="dot"></span>
+          <div><div class="name">影像底图</div><div class="code">T = img_w</div></div>
+          <span class="pair">+ cia_w</span>
+        </div>
+        <div class="mode-card" data-mode="vec" style="--c:#3ecf8e">
+          <span class="dot"></span>
+          <div><div class="name">矢量底图</div><div class="code">T = vec_w</div></div>
+          <span class="pair">+ cva_w</span>
+        </div>
+        <div class="mode-card" data-mode="ter" style="--c:#e8965a">
+          <span class="dot"></span>
+          <div><div class="name">地形晕渲</div><div class="code">T = ter_w</div></div>
+          <span class="pair">+ cta_w</span>
+        </div>
+
+        <div class="sec-t"><b>02</b> 叠加层 OVERLAYS</div>
+        <label class="sw-row" id="annoRow" style="--c:#4a9eff">
+          <input type="checkbox" id="annoToggle" checked>
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">地名注记 <small id="annoCode">T = cia_w</small></span>
+        </label>
+        <label class="sw-row" style="--c:#c9a7ff">
+          <input type="checkbox" id="iboToggle">
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">境界线 <small>T = ibo_w</small></span>
+        </label>
+
+        <div class="sec-t"><b>03</b> 实时图层堆栈 STACK</div>
+        <div id="stackBox"></div>
+        <div id="statusBar" style="font:11px 'JetBrains Mono',Consolas,monospace;color:#8fa3bf;padding:6px 4px 0;"></div>
+      </div>
+
+      <!-- ============ 功能2：坐标拾取控制台 ============ -->
+      <div class="feature-panel" id="panel-picker">
+        <div class="hint">激活本面板后，<b>点击地球</b>拾取坐标；<b>移动鼠标</b>实时读数。快捷键 <code>C</code> / <code>M</code>。</div>
+
+        <div class="sec-t"><b>01</b> 事件开关</div>
+        <label class="sw-row">
+          <input type="checkbox" id="swClick" checked>
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">点击拾取 <small>快捷键 C</small></span>
+          <span class="led on" id="ledClick"></span>
+        </label>
+        <label class="sw-row">
+          <input type="checkbox" id="swMove" checked>
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">移动追踪 <small>快捷键 M</small></span>
+          <span class="led on" id="ledMove"></span>
+        </label>
+
+        <div class="sec-t"><b>02</b> 坐标类型</div>
+        <label class="sw-row"><input type="checkbox" id="ck_latlng" checked><span class="track"><span class="knob"></span></span><span class="txt">经纬度 <small>WGS84 · 度</small></span></label>
+        <label class="sw-row"><input type="checkbox" id="ck_screen"><span class="track"><span class="knob"></span></span><span class="txt">屏幕坐标 <small>像素</small></span></label>
+        <label class="sw-row"><input type="checkbox" id="ck_ellipsoid"><span class="track"><span class="knob"></span></span><span class="txt">椭球面坐标 <small>不含地形</small></span></label>
+        <label class="sw-row"><input type="checkbox" id="ck_scene"><span class="track"><span class="knob"></span></span><span class="txt">场景坐标 <small>需深度检测</small></span></label>
+        <label class="sw-row"><input type="checkbox" id="ck_surface"><span class="track"><span class="knob"></span></span><span class="txt">地表坐标 <small>含地形</small></span></label>
+
+        <div class="sec-t"><b>03</b> 输出与标记</div>
+        <label class="sw-row"><input type="checkbox" id="swConsole" checked><span class="track"><span class="knob"></span></span><span class="txt">控制台输出 <small>console.log</small></span></label>
+        <label class="sw-row"><input type="checkbox" id="swMarker" checked><span class="track"><span class="knob"></span></span><span class="txt">落点标记 <small>最多 12 个</small></span></label>
+
+        <div class="sec-t"><b>04</b> 场景调试</div>
+        <label class="sw-row"><input type="checkbox" id="swDepth"><span class="track"><span class="knob"></span></span><span class="txt">地形深度检测 <small>pickPosition 必需</small></span></label>
+        <label class="sw-row"><input type="checkbox" id="swFps"><span class="track"><span class="knob"></span></span><span class="txt">帧率显示 <small>FPS</small></span></label>
+
+        <div class="btn-row">
+          <button class="btn" id="copyLast" disabled>⧉ 复制经纬度</button>
+          <button class="btn warn" id="clearMarkers">✕ 清除标记</button>
+        </div>
+
+        <div class="last">
+          <h3>LAST PICK · 最近拾取 <button id="copyLast2" title="复制经纬度" disabled style="margin-left:auto;background:none;border:1px solid transparent;color:#5e8b93;font-size:12px;cursor:pointer;padding:0 4px;">⧉</button></h3>
+          <div id="lpRows"><div class="lp-empty">尚未拾取 · 切换到此面板并点击地球</div></div>
+        </div>
+
+        <div class="sec-t"><b>05</b> 拾取记录 PICK LOG</div>
+        <div style="display:flex;align-items:center;gap:8px;font:600 10px 'JetBrains Mono',Consolas,monospace;color:#7fa3a6;">
+          <span>共 <span id="logCount" style="color:#ffb454;">0</span> 条</span>
+          <button id="clearLog" style="margin-left:auto;background:none;border:none;color:#6f9aa2;cursor:pointer;font:600 10px 'JetBrains Mono',Consolas,monospace;letter-spacing:.15em;">清空</button>
+        </div>
+        <div id="logList"><div class="log-empty" id="logEmpty">暂无记录 · 点击地球开始拾取</div></div>
+      </div>
+
+      <!-- ============ 功能3：反选遮罩 + GeoJSON ============ -->
+      <div class="feature-panel" id="panel-mask">
+        <div class="hint">加载本地 GeoJSON 文件，<b>高亮目标区域</b>，其余地区加<b>反向遮罩</b>变暗。基于 turf 合并多边形。</div>
+
+        <div class="sec-t"><b>01</b> 数据源</div>
+        <label class="file-label" for="maskFile">📂 选择 GeoJSON 文件</label>
+        <input type="file" id="maskFile" accept=".json,.geojson,application/json">
+
+<button class="btn warn" id="maskClearFile" style="margin-top: 8px; width: 100%;">✕ 清除已加载文件</button>
+
+        <div class="sec-t"><b>02</b> 区域高亮样式</div>
+        <div class="input-row">
+          <label class="lbl"><span>填充色 (hex)</span><input type="text" id="maskFill" value="#3b82f6"></label>
+          <label class="lbl"><span>填充透明度</span><input type="number" id="maskAlpha" min="0" max="1" step="0.1" value="0.6"></label>
+        </div>
+        
+        <div class="input-row">
+          <label class="lbl"><span>边界线色 (hex)</span><input type="text" id="maskStroke" value="#6dcdeb"></label>
+          <label class="lbl"><span>线宽 (px)</span><input type="number" id="maskWidth" min="1" max="10" step="1" value="2"></label>
+        </div>
+
+        <div class="sec-t"><b>03</b> 反向遮罩样式</div>
+        <div class="input-row">
+          <label class="lbl"><span>遮罩色 (hex)</span><input type="text" id="maskMaskColor" value="#000000"></label>
+          <label class="lbl"><span>遮罩透明度</span><input type="number" id="maskMaskAlpha" min="0" max="1" step="0.1" value="0.6"></label>
+        </div>
+
+        <label class="sw-row"><input type="checkbox" id="maskShowInner" checked><span class="track"><span class="knob"></span></span><span class="txt">显示内部分界线 <small>地市 / 区县</small></span></label>
+
+        <div class="btn-row">
+          <button class="btn success" id="maskApply">✓ 应用遮罩</button>
+          <button class="btn warn" id="maskClear">✕ 清除遮罩</button>
+        </div>
+
+        <div class="status-box info" id="maskStatus">⏳ 请选择 GeoJSON 文件后点击「应用遮罩」</div>
+      </div>
+
+      
+
+      <!-- ============ 功能4：本地位置 GPS ============ -->
+      <div class="feature-panel" id="panel-gps">
+        <div class="hint">调用浏览器 <code>geolocation</code> API，定位到你的 GPS 位置并飞行过去。需要 HTTPS 或 localhost 才能工作。</div>
+
+        <div class="sec-t"><b>01</b> 定位参数</div>
+        <label class="sw-row"><input type="checkbox" id="gpsHighAccuracy" checked><span class="track"><span class="knob"></span></span><span class="txt">启用高精度 GPS</span></label>
+        <div class="input-row">
+          <label class="lbl"><span>超时 (毫秒)</span><input type="number" id="gpsTimeout" min="1000" step="1000" value="10000"></label>
+          <label class="lbl"><span>缓存时长 (毫秒)</span><input type="number" id="gpsMaxAge" min="0" step="1000" value="60000"></label>
+        </div>
+
+        <div class="sec-t"><b>02</b> 飞行参数</div>
+        <div class="input-row">
+          <label class="lbl"><span>飞行终点高度 (m)</span><input type="number" id="gpsAlt" min="100" step="100" value="3000"></label>
+          <label class="lbl"><span>俯视角 (°)</span><input type="number" id="gpsPitch" min="-90" max="0" step="5" value="-60"></label>
+        </div>
+
+        <button class="btn success" id="gpsLocateBtn" style="margin-top:8px;">📡 获取我的位置</button>
+        <div class="status-box info" id="gpsStatus" style="margin-top:8px;">⏳ 点击按钮开始定位</div>
+      </div>
+
+      <!-- ============ 功能5：多源地图 ============ -->
+      <div class="feature-panel" id="panel-multi">
+        <div class="hint">切换到不同地图服务商（高德/百度/腾讯/谷歌/星图/天地图）。<br>⚠️ 国产地图默认 GCJ02/BD09 坐标系，<code>crs:'WGS84'</code> 时插件自动纠偏。</div>
+
+        <div class="sec-t"><b>01</b> 地图服务商</div>
+        <div class="mode-card active" data-provider="tdt" style="--c:#4a9eff">
+          <span class="dot"></span>
+          <div><div class="name">天地图</div><div class="code">TdtImageryProvider</div></div>
+          <span class="pair">WGS84</span>
+        </div>
+        <div class="mode-card" data-provider="amap" style="--c:#e8462b">
+          <span class="dot"></span>
+          <div><div class="name">高德地图</div><div class="code">AMapImageryProvider</div></div>
+          <span class="pair">GCJ02</span>
+        </div>
+        <div class="mode-card" data-provider="baidu" style="--c:#2b65e8">
+          <span class="dot"></span>
+          <div><div class="name">百度地图</div><div class="code">BaiduImageryProvider</div></div>
+          <span class="pair">BD09</span>
+        </div>
+        <div class="mode-card" data-provider="tencent" style="--c:#2fa36b">
+          <span class="dot"></span>
+          <div><div class="name">腾讯地图</div><div class="code">TencentImageryProvider</div></div>
+          <span class="pair">GCJ02</span>
+        </div>
+        <div class="mode-card" data-provider="google" style="--c:#e8965a">
+          <span class="dot"></span>
+          <div><div class="name">谷歌地图</div><div class="code">GoogleImageryProvider</div></div>
+          <span class="pair">GCJ02</span>
+        </div>
+
+        <div class="sec-t"><b>02</b> 样式 / 坐标系</div>
+        <label class="sw-row" style="--c:#43e08c">
+          <input type="checkbox" id="multiWgs84" checked>
+          <span class="track"><span class="knob"></span></span>
+          <span class="txt">强制 WGS84 <small>自动纠偏</small></span>
+        </label>
+        <div class="input-row">
+          <label class="lbl"><span>样式 (img/elec/vec/ter/cva)</span><input type="text" id="multiStyle" value="img"></label>
+        </div>
+        <div class="hint" style="padding-top:6px;">每种服务商支持的样式不同：<br>• 高德：img / elec / cva<br>• 百度：img / vec / normal / dark<br>• 腾讯：1 / img<br>• 谷歌：elec / img / ter / cva<br>• 天地图：vec / img / ter / cia</div>
+
+        <button class="btn success" id="multiApply" style="margin-top:8px;">🔄 应用切换</button>
+        <div class="status-box info" id="multiStatus" style="margin-top:8px;">⏳ 选择服务商后点应用</div>
+      </div>
+
+      <!-- ============ 功能6：本地地形加载 ============ -->
+      <div class="feature-panel" id="panel-terrain">
+        <div class="hint">选择包含 <code>layer.json</code> 的地形文件夹（量化瓦片格式），全部加载到内存并替换当前地形。</div>
+
+        <div class="sec-t"><b>01</b> 文件选择</div>
+        <label class="file-label" for="terrainFolder">📂 选择地形文件夹</label>
+        <input type="file" id="terrainFolder" webkitdirectory directory multiple>
+
+        <div class="sec-t"><b>02</b> 飞行参数</div>
+        <div class="input-row">
+          <label class="lbl"><span>经度</span><input type="number" id="terrainLon" step="any" placeholder="如 116.39"></label>
+          <label class="lbl"><span>纬度</span><input type="number" id="terrainLat" step="any" placeholder="如 39.90"></label>
+        </div>
+        <button class="btn" id="terrainFlyBtn" disabled style="margin-top:6px;">🚀 飞行到该坐标</button>
+
+        <div class="sec-t"><b>03</b> 操作</div>
+        <button class="btn warn" id="terrainReset">↺ 重置为默认地形 (椭球)</button>
+
+        <div class="status-box info" id="terrainStatus" style="margin-top:8px;">⏳ 等待选择文件夹</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 右下：拾取实时读数 -->
+  <div id="readout" class="idle">
+    <div class="ro-head"><span class="led" id="roLed"></span> LIVE READOUT <span class="mode" id="roMode">TRACKING</span></div>
+    <div class="ro-row"><span class="ro-k">经度 LON</span><span class="ro-v" id="roLng">---.------</span></div>
+    <div class="ro-row"><span class="ro-k">纬度 LAT</span><span class="ro-v" id="roLat">---.------</span></div>
+    <div class="ro-row"><span class="ro-k">高程 ALT</span><span class="ro-v" id="roAlt">----.- m</span></div>
+  </div>
+
+  <!-- 提示气泡 -->
+  <div id="toast"></div>
+
+  <script type="text/javascript"> (async () => {
+      try {
+        // 3. 先异步获取地形 Provider
+        const terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
+
+    /* ====================================================================
+     *  公共初始化
+     * ==================================================================== */
+    const TDT_TOKEN = '8c2b8afdfd321dbe7a98d7f78680ab52';
+   
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+
+      imageryProvider: false,
+      baseLayerPicker: false, geocoder: false, homeButton: true,
+      sceneModePicker: false, navigationHelpButton: false,
+      animation: false, timeline: false, fullscreenButton: false,
+      infoBox: false, selectionIndicator: false,
+      terrainProvider: new Cesium.EllipsoidTerrainProvider()
+    });
+    viewer.cesiumWidget.creditContainer.style.display = 'none';
+    viewer.scene.debugShowFramesPerSecond = false;
+
+    /* 工具：通用函数 */
+    const $ = id => document.getElementById(id);
+    function toast(msg) {
+      const t = $('toast');
+      t.textContent = msg; t.classList.add('show');
+      clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1600);
+    }
+    function copyText(text) {
+      const done = () => toast('✓ 已复制：' + text);
+      const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败'); }
+        ta.remove();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fallback);
+      } else fallback();
+    }
+    function setStatus(id, msg, type='info') {
+      const el = $(id);
+      el.textContent = msg; el.className = 'status-box ' + type;
+    }
+
+    /* ====================================================================
+     *  功能切换控制器
+     * ==================================================================== */
+    let activeFeature = 'basemap';
+
+    function switchFeature(name) {
+      if (activeFeature === name) return;
+
+      // 离开旧功能：处理副作用
+      if (activeFeature === 'picker') Picker.deactivate();
+
+      // 切换面板
+      document.querySelectorAll('.feature-panel').forEach(p => p.classList.remove('active'));
+      $('panel-' + name).classList.add('active');
+
+      // 切换导航卡片高亮
+      document.querySelectorAll('.nav-card').forEach(c => c.classList.toggle('active', c.dataset.feature === name));
+
+      // 进入新功能：处理副作用
+      if (name === 'picker') Picker.activate();
+
+      activeFeature = name;
+      toast('切换到：' + ({basemap:'图层切换',picker:'坐标拾取',mask:'反选遮罩',gps:'本地定位',multi:'多源地图',terrain:'本地地形'})[name]);
+    }
+
+    document.querySelectorAll('.nav-card').forEach(card => {
+      card.addEventListener('click', () => switchFeature(card.dataset.feature));
+    });
+
+    /* ====================================================================
+     *  功能1：天地图六图层切换（基于 01_03 快捷按钮切换）
+     * ==================================================================== */
+    const Basemap = (() => {
+      function tdtProvider(service, layer) {
+        return new Cesium.WebMapTileServiceImageryProvider({
+          url: 'https://t{s}.tianditu.gov.cn/' + service + '/wmts?tk=' + TDT_TOKEN,
+          subdomains: ['0','1','2','3','4','5','6','7'],
+          layer: layer, style: 'default', tileMatrixSetID: 'w',
+          format: 'tiles', maximumLevel: 18
+        });
+      }
+
+      const MODES = {
+        img: { color:'#4a9eff', base:'img_w', baseLayer:'img', anno:'cia_w', annoLayer:'cia', annoName:'影像注记' },
+        vec: { color:'#3ecf8e', base:'vec_w', baseLayer:'vec', anno:'cva_w', annoLayer:'cva', annoName:'矢量注记' },
+        ter: { color:'#e8965a', base:'ter_w', baseLayer:'ter', anno:'cta_w', annoLayer:'cta', annoName:'地形注记' }
+      };
+
+      let currentMode = 'img';
+      let annoOn = true;
+      let iboOn = false;
+
+      function renderStack(m) {
+        const box = $('stackBox'); box.innerHTML = '';
+        const stack = [];
+        if (annoOn) stack.push({ name: m.annoName, code: m.anno, c: m.color });
+        if (iboOn) stack.push({ name: '境界线', code: 'ibo_w', c: '#c9a7ff' });
+        stack.push({ name: '底图', code: m.base, c: m.color });
+
+        stack.forEach((item, i) => {
+          const chip = document.createElement('div');
+          chip.className = 'stack-chip';
+          chip.style.setProperty('--c', item.c);
+          chip.style.animationDelay = (i * 0.06) + 's';
+          chip.innerHTML =
+            '<span class="idx">' + (i+1) + '</span>' +
+            '<span>' + item.name + '</span>' +
+            '<span class="code">' + item.code + '</span>';
+          box.appendChild(chip);
+        });
+        const hint = document.createElement('div');
+        hint.className = 'stack-hint';
+        hint.textContent = '▲ 上层覆盖下层';
+        box.appendChild(hint);
+      }
+
+      function render() {
+        const m = MODES[currentMode];
+        viewer.imageryLayers.removeAll();
+        viewer.imageryLayers.addImageryProvider(tdtProvider(m.base, m.baseLayer));
+        if (iboOn) viewer.imageryLayers.addImageryProvider(tdtProvider('ibo_w','ibo'));
+        if (annoOn) viewer.imageryLayers.addImageryProvider(tdtProvider(m.anno, m.annoLayer));
+
+        $('annoCode').textContent = 'T = ' + m.anno;
+        $('annoRow').style.setProperty('--c', m.color);
+
+        renderStack(m);
+        const parts = [m.base];
+        if (iboOn) parts.push('ibo_w');
+        if (annoOn) parts.push(m.anno);
+        $('statusBar').innerHTML = '当前加载：<b style="color:#5fd4a0;">' + parts.join(' + ') + '</b>';
+      }
+
+      // 绑定 UI
+      document.querySelectorAll('#panel-basemap .mode-card').forEach(card => {
+        card.addEventListener('click', () => {
+          document.querySelectorAll('#panel-basemap .mode-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          currentMode = card.dataset.mode;
+          render();
+        });
+      });
+      $('annoToggle').addEventListener('change', e => { annoOn = e.target.checked; render(); });
+      $('iboToggle').addEventListener('change', e => { iboOn = e.target.checked; render(); });
+      $('maskClearFile').onclick = () => {Mask.clearFile();};
+
+      // 初始渲染
+      render();
+
+      return { render, tdtProvider };
+    })();
+
+    /* ====================================================================
+     *  功能2：坐标拾取控制台（基于 05_01）
+     * ==================================================================== */
+    const Picker = (() => {
+      const S = {
+        click: true, move: true,
+        toConsole: true, marker: true,
+        screen: false, ellipsoid: false, latlng: true,
+        scene: false, surface: false,
+        depth: false, fps: false
+      };
+      let lastResult = null;
+      let pickCount = 0;
+      const markers = [];
+      let handler = null;
+      let lastMoveT = 0;
+      let active = false;
+
+      function fmtC3(c) { return 'X ' + c.x.toFixed(1) + '  Y ' + c.y.toFixed(1) + '  Z ' + c.z.toFixed(1); }
+
+      function pickAll(screenPos) {
+        const ellipsoid = viewer.scene.globe.ellipsoid;
+        const pe = viewer.scene.camera.pickEllipsoid(screenPos, ellipsoid);
+        if (!pe) return null;
+        const carto = ellipsoid.cartesianToCartographic(pe);
+        const r = {
+          screen: screenPos, ellipsoid: pe,
+          lng: Cesium.Math.toDegrees(carto.longitude),
+          lat: Cesium.Math.toDegrees(carto.latitude),
+          scene: viewer.scene.pickPosition(screenPos),
+          surface: null
+        };
+        const ray = viewer.camera.getPickRay(screenPos);
+        if (ray) r.surface = viewer.scene.globe.pick(ray, viewer.scene);
+        return r;
+      }
+
+      function mouseCartesian(pos) {
+        try {
+          if (window.latlng && latlng.getCurrentMousePosition) {
+            const p = latlng.getCurrentMousePosition(viewer.scene, pos, null);
+            if (p) return p;
+          }
+        } catch (e) { }
+        let p = null;
+        if (S.depth) p = viewer.scene.pickPosition(pos);
+        if (!p) p = viewer.scene.camera.pickEllipsoid(pos, viewer.scene.globe.ellipsoid);
+        return p;
+      }
+
+      function toLL(c) {
+        if (!c) return null;
+        try {
+          if (window.latlng && latlng.Cartesian3To) {
+            const o = latlng.Cartesian3To(c, viewer).latlng;
+            const lng = o && (o.lng ?? o.longitude);
+            const lat = o && (o.lat ?? o.latitude);
+            if (typeof lng === 'number' && typeof lat === 'number')
+              return { lng, lat, height: o.height ?? o.alt ?? 0 };
+          }
+        } catch (e) { }
+        const carto = viewer.scene.globe.ellipsoid.cartesianToCartographic(c);
+        if (!carto) return null;
+        return {
+          lng: Cesium.Math.toDegrees(carto.longitude),
+          lat: Cesium.Math.toDegrees(carto.latitude),
+          height: carto.height || 0
+        };
+      }
+
+      function printConsole(r) {
+        if (S.screen) console.log('屏幕坐标：', r.screen);
+        if (S.ellipsoid) console.log('WGS84 椭球体坐标：', r.ellipsoid);
+        if (S.latlng) console.log('经纬度坐标：', r.lng, r.lat);
+        if (S.scene) console.log('场景坐标：', r.scene);
+        if (S.surface) console.log('地表坐标：', r.surface);
+      }
+
+      function renderLastPick() {
+        const box = $('lpRows');
+        const btns = [$('copyLast'), $('copyLast2')];
+        if (!lastResult) {
+          box.innerHTML = '<div class="lp-empty">尚未拾取 · 切换到此面板并点击地球</div>';
+          btns.forEach(b => b.disabled = true);
+          return;
+        }
+        btns.forEach(b => b.disabled = false);
+        const r = lastResult, rows = [];
+        if (S.screen) rows.push(['屏幕','x '+r.screen.x+' · y '+r.screen.y]);
+        if (S.ellipsoid) rows.push(['椭球',fmtC3(r.ellipsoid)]);
+        if (S.latlng) rows.push(['经纬度',r.lng.toFixed(6)+', '+r.lat.toFixed(6)]);
+        if (S.scene) rows.push(['场景',r.scene ? fmtC3(r.scene) : (S.depth ? '未拾取到' : '需开启深度检测')]);
+        if (S.surface) rows.push(['地表',r.surface ? fmtC3(r.surface) : '未拾取到']);
+        box.innerHTML = rows.length
+          ? rows.map(([k,v]) => '<div class="lp-row"><span class="lp-k">'+k+'</span><span class="lp-v">'+v+'</span></div>').join('')
+          : '<div class="lp-empty">未在「坐标类型」中勾选任何项</div>';
+      }
+
+      function setReadout(ll) {
+        const ro = $('readout');
+        if (!ll) {
+          $('roLng').textContent = '---.------';
+          $('roLat').textContent = '---.------';
+          $('roAlt').textContent = '----.- m';
+          ro.classList.add('idle');
+          return;
+        }
+        ro.classList.remove('idle');
+        $('roLng').textContent = ll.lng.toFixed(6);
+        $('roLat').textContent = ll.lat.toFixed(6);
+        $('roAlt').textContent = (ll.height||0).toFixed(1) + ' m';
+      }
+
+      function pingReadout() {
+        const ro = $('readout');
+        ro.classList.remove('ping');
+        void ro.offsetWidth;
+        ro.classList.add('ping');
+      }
+
+      function addMarker(r) {
+        const e = viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(r.lng, r.lat),
+          point: {
+            pixelSize: 9,
+            color: Cesium.Color.fromCssColorString('#ffb454'),
+            outlineColor: Cesium.Color.fromCssColorString('#0c1a1f'),
+            outlineWidth: 2
+          },
+          label: {
+            text: r.lng.toFixed(4)+', '+r.lat.toFixed(4),
+            font: '11px "JetBrains Mono", monospace',
+            fillColor: Cesium.Color.fromCssColorString('#ffd28a'),
+            showBackground: true,
+            backgroundColor: Cesium.Color.fromCssColorString('#0c1a1f').withAlpha(0.85),
+            backgroundPadding: new Cesium.Cartesian2(6,4),
+            pixelOffset: new Cesium.Cartesian2(0,-14)
+          }
+        });
+        markers.push(e);
+        if (markers.length > 12) viewer.entities.remove(markers.shift());
+      }
+
+      function addLog(r) {
+        const empty = $('logEmpty');
+        if (empty) empty.remove();
+        const llStr = r.lng.toFixed(6)+', '+r.lat.toFixed(6);
+        const item = document.createElement('div');
+        item.className = 'log-item';
+        item.innerHTML =
+          '<span class="log-idx">#'+String(pickCount).padStart(2,'0')+'</span>' +
+          '<span class="log-ll" title="点击飞行定位">'+llStr+'</span>' +
+          '<button title="复制">⧉</button>';
+        item.querySelector('.log-ll').onclick = () => {
+          viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(r.lng, r.lat, 400000), duration: 1.4 });
+        };
+        item.querySelector('button').onclick = () => copyText(llStr);
+        $('logList').prepend(item);
+        while ($('logList').children.length > 30) $('logList').lastChild.remove();
+        $('logCount').textContent = pickCount;
+      }
+
+      function applyStateToUI() {
+        // 根据 S.click / S.move 与 active 同步 LED、cursor、读数显示
+        const clickOn = active && S.click;
+        const moveOn = active && S.move;
+        viewer.scene.canvas.style.cursor = clickOn ? 'crosshair' : 'default';
+        $('ledClick').classList.toggle('on', clickOn);
+        $('ledMove').classList.toggle('on', moveOn);
+        $('roLed').classList.toggle('on', moveOn);
+        $('roMode').textContent = (clickOn || moveOn) ? 'TRACKING' : 'STANDBY';
+        $('readout').classList.toggle('show', active);
+        if (!moveOn) setReadout(null);
+      }
+
+      function activate() {
+        active = true;
+        applyStateToUI();
+        if (!handler) {
+          handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+          handler.setInputAction(function (movement) {
+            if (!active || !S.click) return;
+            const r = pickAll(movement.position);
+            if (!r) { toast('⚠ 点击位置不在地球表面'); return; }
+            lastResult = r; pickCount++;
+            if (S.toConsole) printConsole(r);
+            renderLastPick();
+            if (S.marker) addMarker(r);
+            addLog(r);
+            pingReadout();
+          }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+          handler.setInputAction(function (movement) {
+            if (!active || !S.move) return;
+            const now = performance.now();
+            if (now - lastMoveT < 80) return;
+            lastMoveT = now;
+            const ll = toLL(mouseCartesian(movement.endPosition));
+            setReadout(ll);
+          }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+        }
+      }
+
+      function deactivate() {
+        active = false;
+        applyStateToUI();
+        // 不修改 UI 复选框状态，保留用户设置；下次激活时按设置恢复
+      }
+
+      // 绑定开关
+      function bindSw(id, key, fn) {
+        $(id).addEventListener('change', e => {
+          S[key] = e.target.checked;
+          if (fn) fn(e.target.checked);
+          applyStateToUI();  // 任何开关变更后同步 UI
+        });
+      }
+      bindSw('swClick', 'click');
+      bindSw('swMove', 'move');
+      bindSw('swConsole', 'toConsole');
+      bindSw('swMarker', 'marker');
+      bindSw('swDepth', 'depth', on => {
+        viewer.scene.globe.depthTestAgainstTerrain = on;
+        toast(on ? '已开启地形深度检测' : '已关闭地形深度检测');
+      });
+      bindSw('swFps', 'fps', on => { viewer.scene.debugShowFramesPerSecond = on; });
+
+      ['screen','ellipsoid','latlng','scene','surface'].forEach(k => {
+        $('ck_'+k).addEventListener('change', e => { S[k] = e.target.checked; renderLastPick(); });
+      });
+
+      // 按钮
+      const copyLastLL = () => {
+        if (lastResult) copyText(lastResult.lng.toFixed(6)+', '+lastResult.lat.toFixed(6));
+      };
+      $('copyLast').onclick = copyLastLL;
+      $('copyLast2').onclick = copyLastLL;
+      $('clearMarkers').onclick = () => {
+        markers.forEach(m => viewer.entities.remove(m));
+        markers.length = 0;
+        toast('已清除全部标记');
+      };
+      $('clearLog').onclick = () => {
+        $('logList').innerHTML = '<div class="log-empty" id="logEmpty">暂无记录 · 点击地球开始拾取</div>';
+        $('logCount').textContent = '0';
+        toast('已清空拾取记录');
+      };
+
+      renderLastPick();
+
+      return {
+        activate,
+        deactivate,
+        get active() { return active; }
+      };
+    })();
+
+    /* ====================================================================
+     *  功能3：GeoJSON 反选遮罩（基于 11）
+     * ==================================================================== */
+    // 假设 $ 是你的全局简写函数
+      // const $ = (id) => document.getElementById(id);
+
+      // ============ 遮罩模块 ============
+      const Mask = (() => {
+        let geojsonData = null;
+        let fileName = '';
+        const maskEntityIds = []; // 遮罩 + 高亮 + 贴地线 实体 id 列表
+
+        function clearAll() {
+          maskEntityIds.forEach(id => {
+            const e = viewer.entities.getById(id);
+            if (e) viewer.entities.remove(e);
+          });
+          maskEntityIds.length = 0;
+          // GeoJsonDataSource：移除已加载的数据源
+          const dsList = viewer.dataSources;
+          for (let i = dsList.length - 1; i >= 0; i--) {
+            const ds = dsList.get(i);
+            if (ds && ds.name && ds.name.indexOf('__mask_ds__') === 0) {
+              viewer.dataSources.remove(ds);
+            }
+          }
+        }
+
+        // 👇 新增：清除已加载文件
+        function clearFile() {
+          geojsonData = null;
+          fileName = '';
+          // 清空文件选择框（浏览器不会触发 change 事件，必须手动清空 value）
+          const fileInput = document.getElementById('maskFile');
+          if (fileInput) fileInput.value = '';
+          setStatus('maskStatus', '⏳ 文件已清除，请重新选择 GeoJSON 文件', 'info');
+        }
+
+        function hexToColor(hex, alpha) {
+          try {
+            return Cesium.Color.fromCssColorString(hex).withAlpha(alpha);
+          } catch (e) {
+            return Cesium.Color.BLUE.withAlpha(alpha);
+          }
+        }
+
+        function apply() {
+          if (!geojsonData) {
+            setStatus('maskStatus', '❌ 请先选择 GeoJSON 文件', 'error');
+            return;
+          }
+          clearAll();
+
+          const fillColor = hexToColor($('maskFill').value, parseFloat($('maskAlpha').value));
+          const strokeColor = Cesium.Color.fromCssColorString($('maskStroke').value || '#6dcdeb');
+          const strokeWidth = parseInt($('maskWidth').value) || 2;
+          const maskColor = Cesium.Color.fromCssColorString($('maskMaskColor').value || '#000000')
+            .withAlpha(parseFloat($('maskMaskAlpha').value));
+          const showInner = $('maskShowInner').checked;
+
+          // 步骤 A：高亮填充 + 边界线
+          Cesium.GeoJsonDataSource.load(geojsonData, {
+            name: '__mask_ds__' + Date.now(),
+            stroke: strokeColor,
+            fill: fillColor,
+            strokeWidth: 2,
+            clampToGround: true
+          }).then((dataSource) => {
+            viewer.dataSources.add(dataSource);
+            viewer.flyTo(dataSource, { duration: 3 });
+          });
+
+          // 步骤 B：合并 → 反向遮罩
+          const combined = turf.combine(geojsonData);
+          const mergedPolygon = combined.features[0];
+          if (!mergedPolygon || !mergedPolygon.geometry) {
+            setStatus('maskStatus', '❌ 合并失败：geojson 无有效 geometry', 'error');
+            return;
+          }
+          const geom = mergedPolygon.geometry;
+          const outerRings = [];
+          if (geom.type === 'MultiPolygon') {
+            geom.coordinates.forEach((polygon) => outerRings.push(polygon[0]));
+          } else if (geom.type === 'Polygon') {
+            outerRings.push(geom.coordinates[0]);
+          }
+          const holes = outerRings.map((ring) => {
+            const flat = [];
+            ring.forEach((pt) => flat.push(pt[0], pt[1]));
+            return { positions: Cesium.Cartesian3.fromDegreesArray(flat) };
+          });
+
+          // 步骤 A+：补回贴地边界线（含地市分界线）
+          if (showInner) {
+            const eachRing = (g, cb) => {
+              if (g.type === 'Polygon') g.coordinates.forEach(cb);
+              else if (g.type === 'MultiPolygon') g.coordinates.forEach((poly) => poly.forEach(cb));
+            };
+            geojsonData.features.forEach((feature) => {
+              eachRing(feature.geometry, (ring) => {
+                const flat = [];
+                ring.forEach((pt) => flat.push(pt[0], pt[1]));
+                const e = viewer.entities.add({
+                  polyline: {
+                    positions: Cesium.Cartesian3.fromDegreesArray(flat),
+                    width: strokeWidth,
+                    material: strokeColor,
+                    clampToGround: true
+                  }
+                });
+                maskEntityIds.push(e.id);
+              });
+            });
+          }
+
+          // 自动算外框：基于 turf.bbox 外扩
+          const bbox = turf.bbox(geojsonData); // [minX, minY, maxX, maxY]
+          const pad = Math.max((bbox[2] - bbox[0]) * 0.5, (bbox[3] - bbox[1]) * 0.5, 5);
+          const x1 = bbox[0] - pad, y1 = bbox[1] - pad, x2 = bbox[2] + pad, y2 = bbox[3] + pad;
+
+          const maskEntity = viewer.entities.add({
+            id: 'maskArea_' + Date.now(),
+            polygon: {
+              hierarchy: {
+                positions: Cesium.Cartesian3.fromDegreesArray([x1, y1, x1, y2, x2, y2, x2, y1]),
+                holes: holes
+              },
+              material: maskColor,
+              classificationType: Cesium.ClassificationType.BOTH
+            }
+          });
+          maskEntityIds.push(maskEntity.id);
+
+          setStatus('maskStatus', '✅ 已应用遮罩！\n要素数: ' + (geojsonData.features.length) + '\n文件: ' + fileName, 'success');
+        }
+
+        // 绑定 UI
+        $('maskFile').addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          fileName = file.name;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              geojsonData = JSON.parse(ev.target.result);
+              setStatus('maskStatus', '✓ 已读取: ' + fileName + '\n要素数: ' + geojsonData.features.length + '\n点击「应用遮罩」生效', 'info');
+            } catch (err) {
+              setStatus('maskStatus', '❌ JSON 解析失败: ' + err.message, 'error');
+            }
+          };
+          reader.readAsText(file);
+        });
+
+        $('maskApply').onclick = apply;
+        $('maskClear').onclick = () => {
+          clearAll();
+          setStatus('maskStatus', '已清除遮罩与高亮实体', 'info');
+        };
+
+        // 👇 新增：绑定清除文件按钮
+        $('maskClearFile').onclick = () => {
+          clearFile();
+        };
+
+        return { apply, clearAll, clearFile };
+      })();
+
+
+      // ============ 底图模块 ============
+      const Basemap1 = (() => {
+        function tdtProvider(service, layer) {
+          return new Cesium.WebMapTileServiceImageryProvider({
+            url: 'https://t{s}.tianditu.gov.cn/' + service + '/wmts?tk=' + TDT_TOKEN,
+            subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
+            layer: layer, style: 'default', tileMatrixSetID: 'w',
+            format: 'tiles', maximumLevel: 18
+          });
+        }
+
+        const MODES = {
+          img: { color: '#4a9eff', base: 'img_w', baseLayer: 'img', anno: 'cia_w', annoLayer: 'cia', annoName: '影像注记' },
+          vec: { color: '#3ecf8e', base: 'vec_w', baseLayer: 'vec', anno: 'cva_w', annoLayer: 'cva', annoName: '矢量注记' },
+          ter: { color: '#e8965a', base: 'ter_w', baseLayer: 'ter', anno: 'cta_w', annoLayer: 'cta', annoName: '地形注记' }
+        };
+
+        let currentMode = 'img';
+        let annoOn = true;
+        let iboOn = false;
+
+        function renderStack(m) {
+          const box = $('stackBox'); box.innerHTML = '';
+          const stack = [];
+          if (annoOn) stack.push({ name: m.annoName, code: m.anno, c: m.color });
+          if (iboOn) stack.push({ name: '境界线', code: 'ibo_w', c: '#c9a7ff' });
+          stack.push({ name: '底图', code: m.base, c: m.color });
+
+          stack.forEach((item, i) => {
+            const chip = document.createElement('div');
+            chip.className = 'stack-chip';
+            chip.style.setProperty('--c', item.c);
+            chip.style.animationDelay = (i * 0.06) + 's';
+            chip.innerHTML =
+              '<span class="idx">' + (i + 1) + '</span>' +
+              '<span>' + item.name + '</span>' +
+              '<span class="code">' + item.code + '</span>';
+            box.appendChild(chip);
+          });
+          const hint = document.createElement('div');
+          hint.className = 'stack-hint';
+          hint.textContent = '▲ 上层覆盖下层';
+          box.appendChild(hint);
+        }
+
+        function render() {
+          const m = MODES[currentMode];
+          viewer.imageryLayers.removeAll();
+          viewer.imageryLayers.addImageryProvider(tdtProvider(m.base, m.baseLayer));
+          if (iboOn) viewer.imageryLayers.addImageryProvider(tdtProvider('ibo_w', 'ibo'));
+          if (annoOn) viewer.imageryLayers.addImageryProvider(tdtProvider(m.anno, m.annoLayer));
+
+          $('annoCode').textContent = 'T = ' + m.anno;
+          $('annoRow').style.setProperty('--c', m.color);
+
+          renderStack(m);
+          const parts = [m.base];
+          if (iboOn) parts.push('ibo_w');
+          if (annoOn) parts.push(m.anno);
+          $('statusBar').innerHTML = '当前加载：<b style="color:#5fd4a0;">' + parts.join(' + ') + '</b>';
+        }
+
+        // 绑定 UI
+        document.querySelectorAll('#panel-basemap .mode-card').forEach(card => {
+          card.addEventListener('click', () => {
+            document.querySelectorAll('#panel-basemap .mode-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            currentMode = card.dataset.mode;
+            render();
+          });
+        });
+        $('annoToggle').addEventListener('change', e => { annoOn = e.target.checked; render(); });
+        $('iboToggle').addEventListener('change', e => { iboOn = e.target.checked; render(); });
+
+        // 👇 注意：这里已经删除了原本错误绑定的 Mask.clearFile() 代码
+
+        // 初始渲染
+        render();
+
+        return { render, tdtProvider };
+      })();
+    /* ====================================================================
+     *  功能4：获取本地 GPS 位置（基于 14）
+     * ==================================================================== */
+    const GPS = (() => {
+      const markerId = 'currentUserMarker';
+      let loading = false;
+
+      function setLoading(show) {
+        const btn = $('gpsLocateBtn');
+        btn.disabled = show;
+        btn.textContent = show ? '⏳ 定位中...' : '📡 获取我的位置';
+      }
+
+      function updateMarker(longitude, latitude) {
+        if (viewer.entities.getById(markerId)) {
+          viewer.entities.getById(markerId).position = Cesium.Cartesian3.fromDegrees(longitude, latitude);
+        } else {
+          viewer.entities.add({
+            id: markerId,
+            name: '我的位置',
+            position: Cesium.Cartesian3.fromDegrees(longitude, latitude),
+            point: {
+              pixelSize: 18, color: Cesium.Color.RED,
+              outlineColor: Cesium.Color.WHITE, outlineWidth: 3
+            },
+            label: {
+              text: '📍 我的位置', font: '14px sans-serif',
+              fillColor: Cesium.Color.WHITE,
+              outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              pixelOffset: new Cesium.Cartesian2(0, -20)
+            }
+          });
+        }
+      }
+
+      function locate() {
+        if (!navigator.geolocation) {
+          setStatus('gpsStatus', '❌ 浏览器不支持 geolocation', 'error');
+          return;
+        }
+        setLoading(true);
+        setStatus('gpsStatus', '⏳ 正在获取位置...', 'info');
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { longitude, latitude, altitude, accuracy } = position.coords;
+            updateMarker(longitude, latitude);
+            const alt = parseFloat($('gpsAlt').value) || 3000;
+            const pitch = parseFloat($('gpsPitch').value) || -60;
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, alt),
+              orientation: {
+                heading: Cesium.Math.toRadians(0),
+                pitch: Cesium.Math.toRadians(pitch),
+                roll: 0
+              },
+              duration: 2
+            });
+            setStatus('gpsStatus',
+              '✅ 定位成功！\n经度: ' + longitude.toFixed(6) + '°\n纬度: ' + latitude.toFixed(6) +
+              '°\n海拔: ' + (altitude||0).toFixed(1) + ' m\n精度: ±' + accuracy.toFixed(0) + ' m',
+              'success');
+            setLoading(false);
+          },
+          (error) => {
+            setLoading(false);
+            const msgs = {
+              [error.PERMISSION_DENIED]: '❌ 用户拒绝定位请求',
+              [error.POSITION_UNAVAILABLE]: '❌ 无法获取位置（GPS/网络异常）',
+              [error.TIMEOUT]: '❌ 定位超时'
+            };
+            setStatus('gpsStatus', msgs[error.code] || ('❌ 错误: ' + error.message), 'error');
+          },
+          {
+            enableHighAccuracy: $('gpsHighAccuracy').checked,
+            timeout: parseInt($('gpsTimeout').value) || 10000,
+            maximumAge: parseInt($('gpsMaxAge').value) || 60000
+          }
+        );
+      }
+
+      $('gpsLocateBtn').onclick = locate;
+      return { locate };
+    })();
+
+    /* ====================================================================
+     *  功能5：多源地图（基于 12 高德等外界）
+     *  注意：需要 @cesium-china/cesium-map 插件已成功加载
+     * ==================================================================== */
+    const Multi = (() => {
+      let currentProvider = 'tdt';
+
+      function makeProvider(name, style, wgs84) {
+        const crs = wgs84 ? 'WGS84' : undefined;
+        switch (name) {
+          case 'tdt':
+            return new Cesium.WebMapTileServiceImageryProvider({
+              url: 'https://t{s}.tianditu.gov.cn/' + (style==='vec' ? 'vec_w' : style==='ter' ? 'ter_w' : 'img_w') + '/wmts?tk=' + TDT_TOKEN,
+              subdomains: ['0','1','2','3','4','5','6','7'],
+              layer: style==='vec' ? 'vec' : style==='ter' ? 'ter' : 'img',
+              style: 'default', tileMatrixSetID: 'w',
+              format: 'tiles', maximumLevel: 18
+            });
+          case 'amap':
+            return new Cesium.AMapImageryProvider({ style: style || 'img', crs });
+          case 'baidu':
+            return new Cesium.BaiduImageryProvider({ style: style || 'normal', crs });
+          case 'tencent':
+            // 腾讯 style: 1 (经典) 或 img
+            return new Cesium.TencentImageryProvider({ style: (style === 'img' ? 'img' : 1), crs });
+          case 'google':
+            return new Cesium.GoogleImageryProvider({ style: style || 'elec', crs });
+          case 'geovis':
+            return new Cesium.GeoVisImageryProvider({ style: style || 'vec' });
+          default:
+            return null;
+        }
+      }
+
+      function apply() {
+        const style = $('multiStyle').value.trim() || 'img';
+        const wgs84 = $('multiWgs84').checked;
+        const providerName = currentProvider;
+        let provider;
+        try {
+          provider = makeProvider(providerName, style, wgs84);
+          if (!provider) throw new Error('未知服务商: ' + providerName);
+        } catch (err) {
+          setStatus('multiStatus', '❌ 创建图层失败: ' + err.message + '\n（请确认 cesium-map 插件已加载）', 'error');
+          return;
+        }
+        viewer.imageryLayers.removeAll();
+        viewer.imageryLayers.addImageryProvider(provider);
+        setStatus('multiStatus',
+          '✅ 已切换到 ' + providerName.toUpperCase() + '\n样式: ' + style + ' · 坐标系: ' + (wgs84 ? 'WGS84 (纠偏)' : '原生'),
+          'success');
+      }
+
+      document.querySelectorAll('#panel-multi .mode-card').forEach(card => {
+        card.addEventListener('click', () => {
+          document.querySelectorAll('#panel-multi .mode-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          currentProvider = card.dataset.provider;
+        });
+      });
+      $('multiApply').onclick = apply;
+      return { apply };
+    })();
+
+    /* ====================================================================
+     *  功能6：本地地形加载（基于 02AI）
+     * ==================================================================== */
+    const Terrain = (() => {
+      const localBlobMap = new Map();
+      const VIRTUAL_URL_PREFIX = 'http://local-terrain-mock/';
+      let originalFetchPatched = false;
+
+      function patchFetch() {
+        if (originalFetchPatched) return;
+        const originalFetch = Cesium.Resource.prototype.fetch;
+        Cesium.Resource.prototype.fetch = function (options) {
+          try {
+            if (this.url && this.url.startsWith(VIRTUAL_URL_PREFIX)) {
+              let relativePath = this.url.replace(VIRTUAL_URL_PREFIX, '');
+              const queryIndex = relativePath.indexOf('?');
+              if (queryIndex !== -1) relativePath = relativePath.substring(0, queryIndex);
+              if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
+              const blobUrl = localBlobMap.get(relativePath);
+              if (blobUrl) {
+                return fetch(blobUrl).then(response => {
+                  const responseType = options?.responseType || this.responseType;
+                  if (responseType === 'json') return response.json();
+                  if (responseType === 'arraybuffer') return response.arrayBuffer();
+                  if (responseType === 'blob') return response.blob();
+                  if (responseType === 'text') return response.text();
+                  return response;
+                });
+              } else {
+                return Promise.resolve(new Response(null, { status: 404, statusText: 'Not Found' }));
+              }
+            }
+          } catch (e) { console.error(e); }
+          return originalFetch.call(this, options);
+        };
+        originalFetchPatched = true;
+      }
+
+      async function loadFromFolder(fileList) {
+        setStatus('terrainStatus', '🔍 扫描中...', 'info');
+        let layerJsonFile = null, rootPrefix = '';
+        localBlobMap.forEach(url => URL.revokeObjectURL(url));
+        localBlobMap.clear();
+
+        for (const file of fileList) {
+          const relPath = file.webkitRelativePath.replace(/\\/g,'/');
+          if (relPath.endsWith('/layer.json')) {
+            layerJsonFile = file;
+            rootPrefix = relPath.replace(/layer\.json$/, '');
+          }
+        }
+        if (!layerJsonFile) {
+          setStatus('terrainStatus', '❌ 未找到 layer.json', 'error');
+          return;
+        }
+        for (const file of fileList) {
+          let relPath = file.webkitRelativePath.replace(/\\/g,'/');
+          const normalizedPath = relPath.startsWith(rootPrefix) ? relPath.slice(rootPrefix.length) : relPath;
+          localBlobMap.set(normalizedPath, URL.createObjectURL(file));
+        }
+        setStatus('terrainStatus', '📦 索引 ' + localBlobMap.size + ' 个文件...', 'info');
+        try {
+          patchFetch();
+          const provider = await Cesium.CesiumTerrainProvider.fromUrl(VIRTUAL_URL_PREFIX);
+          viewer.terrainProvider = provider;
+          viewer.scene.requestRender();
+          setStatus('terrainStatus', '✅ 加载成功！\n瓦片数: ' + localBlobMap.size, 'success');
+          $('terrainFlyBtn').disabled = false;
+          if (provider._rectangle) {
+            viewer.camera.flyTo({ destination: provider._rectangle, duration: 1.5 });
+          }
+        } catch (err) {
+          setStatus('terrainStatus', '❌ 失败: ' + err.message, 'error');
+          console.error(err);
+        }
+      }
+
+      function reset() {
+        viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+        localBlobMap.forEach(url => URL.revokeObjectURL(url));
+        localBlobMap.clear();
+        $('terrainFlyBtn').disabled = true;
+        setStatus('terrainStatus', '已重置为默认椭球地形', 'info');
+      }
+
+      $('terrainFolder').addEventListener('change', async (e) => {
+        if (e.target.files.length > 0) await loadFromFolder(e.target.files);
+      });
+      $('terrainFlyBtn').addEventListener('click', () => {
+        const lon = parseFloat($('terrainLon').value);
+        const lat = parseFloat($('terrainLat').value);
+        if (isNaN(lon) || isNaN(lat)) { toast('⚠️ 请输入有效经纬度'); return; }
+        if (lon < -180 || lon > 180 || lat < -90 || lat > 90) { toast('⚠️ 坐标范围错误'); return; }
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(lon, lat, 500),
+          orientation: {
+            heading: Cesium.Math.toRadians(0),
+            pitch: Cesium.Math.toRadians(-45),
+            roll: 0.0
+          },
+          duration: 2.0
+        });
+      });
+      $('terrainReset').onclick = reset;
+
+      return { loadFromFolder, reset };
+    })();
+
+    /* ====================================================================
+     *  初始视角 & 快捷键
+     * ==================================================================== */
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(104.0, 35.0, 6000000)
+    });
+    window.addEventListener('keydown', e => {
+      if (e.key === 'c' || e.key === 'C') {
+        const el = $('swClick'); el.checked = !el.checked; el.dispatchEvent(new Event('change'));
+      }
+      if (e.key === 'm' || e.key === 'M') {
+        const el = $('swMove'); el.checked = !el.checked; el.dispatchEvent(new Event('change'));
+      }
+    });
+    console.log('✅ 综合功能控制台已就绪（6 大功能整合）');
+  }
+   catch (error) {
+          console.error("加载出错:", error);
+        }
+      }) ();
+  </script>
+</body>
+
+</html>
