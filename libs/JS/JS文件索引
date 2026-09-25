@@ -4,3 +4,4 @@
 04 CesiumVectorTile.js  加载矢量地图插件
 05 mvt.js               MVT 矢量瓦片渲染插件 
 06 ol.js                
+07 excavateTerrain.js   挖坑

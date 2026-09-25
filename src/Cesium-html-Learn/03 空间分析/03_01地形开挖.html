@@ -1,0 +1,107 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="./../../../libs/cesium/Widgets/widgets.css">
+    <script type="text/javascript" src="./../../../libs/cesium/Cesium.js"></script>
+    <script src="./../../../libs/JS/excavateTerrain.js"></script>
+</head>
+
+<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
+    <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
+
+    <script type="text/javascript">
+
+        const viewer = new Cesium.Viewer('map', {
+            // 去掉对话框警告
+            infoBox: false,
+            // 是否显示查询按钮
+            geocoder: true,
+            // 是否显示home按钮
+            homeButton: true,
+            // 控制查看器的显示模式（3D、2.5D、2D是否显示）
+            sceneModePicker: true,
+            // 是否显示图层选择
+            baseLayerPicker: false,
+            // 是否显示帮助按钮
+            navigationHelpButton: false,
+            // 是否显示播放动画、计时
+            animation: false,
+            // 是否显示时间轴
+            timeline: false,
+            // 是否显示全屏按钮
+            fullscreenButton: false,
+
+        });
+                //隐藏 Cesium 的版权信息水印。
+                viewer.cesiumWidget.creditContainer.style.display = "none";
+                // 开启帧率
+                viewer.scene.debugShowFramesPerSecond = true;
+
+
+    // 天地图影像底图（卫星图）
+    const tiandituImgLayer = new Cesium.WebMapTileServiceImageryProvider({
+        //url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=你的Key", //修改成自己的token
+        //url: 'https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=你的Key'
+        url: "https://t0.tianditu.gov.cn/img_w/wmts?tk=8c2b8afdfd321dbe7a98d7f78680ab52", //修改成自己的token
+        layer: "img",
+        style: "default",
+        tileMatrixSetID: "w",
+        format: "tiles",
+        maximumLevel: 18
+    });
+    viewer.imageryLayers.addImageryProvider(tiandituImgLayer);
+
+
+
+        // 开启帧率
+        viewer.scene.debugShowFramesPerSecond = true;
+
+        // // 加载默认地形
+        // viewer.terrainProvider = new Cesium.CesiumTerrainProvider({
+        //     url: '//data.mars3d.cn/terrain'
+        // });
+
+
+        // 深度监测
+        viewer.scene.globe.depthTestAgainstTerrain = true;
+
+        viewer.camera.setView({
+            destination: new Cesium.Cartesian3(-2409728.6420393116, 4694838.793290997, 3570221.295666795)
+        });
+
+        var mr = [{
+            x: -2409728.6420393116,
+            y: 4694838.793290997,
+            z: 3570221.295666795
+        },
+        {
+            x: -2409788.2788523836,
+            y: 4694808.716559992,
+            z: 3570220.598452356
+        },
+        {
+            x: -2409813.389689466,
+            y: 4694859.279606352,
+            z: 3570137.7191554685
+        },
+        {
+            x: -2409755.7791936737,
+            y: 4694886.737790491,
+            z: 3570140.4776008143
+        }
+        ];
+
+        new excavateTerrain(viewer, {
+            positions: mr, //// 要挖的多边形范围（上面那4个点）
+            height: 30,  // 往下挖的深度：30米
+            bottom: "./../../../libs/image/ter_analysis/excavationregion_side.jpg",  // 坑底贴的图
+            side: "./../../../libs/image/ter_analysis/excavationregion_top.jpg", //// 坑壁贴的图
+        })
+
+    </script>
+</body>
+
+</html>

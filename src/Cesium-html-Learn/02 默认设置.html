@@ -45,8 +45,18 @@
     });
     //隐藏 Cesium 的版权信息水印。
     viewer.cesiumWidget.creditContainer.style.display = "none";
-     // 开启帧率
+     // 开启帧率,
+        // 21.61 MS（毫秒）
+        // 这代表帧生成时间。意思是显卡渲染出一张图片（一帧）并显示在屏幕上，花了 21.61 毫秒。
+        // 越小说明越快：这个数值越低，说明画面切换得越跟手。
+        // 43 FPS（每秒传输帧数）
+        // 这代表帧率。意思是屏幕每秒钟刷新了 43 次画面。
+        // 越大说明越流畅：这个数值越高，画面看起来就越顺滑。
      viewer.scene.debugShowFramesPerSecond = true;
+
+
+//开启深度检测。打开后，埋在地形下面的东西会被地形挡住（正确遮挡）；不开的话，地下的东西会"透视"浮出来。
+     //viewer.scene.globe.depthTestAgainstTerrain = true; 
 
         */
 
@@ -149,8 +159,7 @@
         // viewer.scene.morphTo2D()
         // viewer.scene.morphTo3D()
 
-        // 深度监测
-        viewer.scene.globe.depthTestAgainstTerrain = true;
+    
 
         // latlng.getCameraView(viewer)
         // // 目的地带方向
